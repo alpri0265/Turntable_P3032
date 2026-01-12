@@ -7,6 +7,7 @@
 #include "stepper.h"
 #include "menu.h"
 #include "direction_switch.h"
+#include "start_stop.h"
 
 /* ================== ОБʼЄКТИ ================== */
 Encoder encoder(ENC_A, ENC_B);
@@ -25,6 +26,7 @@ Memory memory(MIN_POS, MAX_POS);
 Stepper stepper(STEP_PIN, DIR_PIN);
 Menu menu;
 DirectionSwitch directionSwitch(DIRECTION_SWITCH_PIN);
+StartStop startStop(START_STOP_BUTTON_PIN, START_STOP_LED_PIN, BUTTON_DEBOUNCE_MS);
 
 /* ================== ЗМІННІ ================== */
 unsigned long lastDisplayUpdate = 0;
@@ -37,6 +39,7 @@ void setup() {
   display.begin();
   stepper.begin();
   directionSwitch.begin();
+  startStop.begin();
   
   // Завантажуємо позицію з пам'яті
   int32_t savedPosition = 0;
@@ -66,6 +69,10 @@ void loop() {
   // Оновлюємо навігацію по меню (інкрементальний енкодер + кнопка)
   menu.updateNavigation(encoderDelta, buttonPressed);
   
+  // Обробка кнопки старт-стоп
+  startStop.toggle();
+  startStop.updateLED();
+  
   // Читаємо перемикач напрямку та встановлюємо інверсію
   static RotationDirection currentDirection = DIR_CW;
   currentDirection = directionSwitch.read();
@@ -74,14 +81,19 @@ void loop() {
   // Отримуємо цільову позицію з меню
   int32_t targetPosition = menu.getTargetPosition();
   
-  // Виконуємо рух до цільової позиції
-  int32_t stepsNeeded = targetPosition - stepper.getPosition() - stepper.getRemaining();
-  if (stepsNeeded != 0) {
-    stepper.move(stepsNeeded);
+  // Виконуємо рух до цільової позиції (тільки якщо старт активний)
+  if (startStop.getState()) {
+    int32_t stepsNeeded = targetPosition - stepper.getPosition() - stepper.getRemaining();
+    if (stepsNeeded != 0) {
+      stepper.move(stepsNeeded);
+    }
+    
+    // Оновлюємо кроковий двигун (неблокуюче)
+    stepper.update();
+  } else {
+    // Якщо стоп - зупиняємо рух
+    // (stepper.update() не викликається, тому рух зупиняється)
   }
-  
-  // Оновлюємо кроковий двигун (неблокуюче)
-  stepper.update();
   
   // Обробка збереження
   static unsigned long saveMessageTime = 0;

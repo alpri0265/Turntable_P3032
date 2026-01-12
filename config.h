@@ -12,15 +12,22 @@
 
 // LCD I2C mode (для LCD1602 або LCD2004 з I2C модулем)
 #define LCD_I2C_ADDRESS 0x27  // Стандартна адреса I2C (може бути 0x3F)
-#define LCD_I2C_SDA 20         // SDA для Arduino Mega (SDA)
-#define LCD_I2C_SCL 21         // SCL для Arduino Mega (SCL)
+
+// Автоматичне визначення пінів I2C залежно від платформи
+#if defined(ARDUINO_AVR_NANO) || defined(ARDUINO_AVR_UNO)
+  #define LCD_I2C_SDA A4       // SDA для Arduino Nano/Uno
+  #define LCD_I2C_SCL A5       // SCL для Arduino Nano/Uno
+#else
+  #define LCD_I2C_SDA 20       // SDA для Arduino Mega
+  #define LCD_I2C_SCL 21       // SCL для Arduino Mega
+#endif
 
 /* ================== LCD НАЛАШТУВАННЯ ================== */
 // Виберіть тип дисплея: 1 = LCD1602 (16x2), 2 = LCD2004 (20x4)
 #define LCD_TYPE 2
 
 // Виберіть режим: 0 = 4-bit, 1 = I2C
-#define LCD_MODE 0
+#define LCD_MODE 1  // I2C (працює на Mega та Nano)
 
 // Encoder (інкрементальний)
 #define ENC_A   2      // INT0
@@ -38,8 +45,14 @@
 #define DIRECTION_SWITCH_PIN 5  // Пін для перемикача напрямку
 
 // Кнопка старт-стоп зі світлодіодом
-#define START_STOP_BUTTON_PIN 22  // Пін для кнопки старт-стоп
-#define START_STOP_LED_PIN 23     // Пін для світлодіода старт-стоп
+// Автоматичне визначення пінів залежно від платформи
+#if defined(ARDUINO_AVR_NANO) || defined(ARDUINO_AVR_UNO)
+  #define START_STOP_BUTTON_PIN 12  // Пін для кнопки старт-стоп (Nano/Uno)
+  #define START_STOP_LED_PIN 11     // Пін для світлодіода старт-стоп (Nano/Uno)
+#else
+  #define START_STOP_BUTTON_PIN 22  // Пін для кнопки старт-стоп (Mega)
+  #define START_STOP_LED_PIN 23     // Пін для світлодіода старт-стоп (Mega)
+#endif
 
 /* ================== МЕХАНІКА ================== */
 #define STEPS_PER_REV 200
