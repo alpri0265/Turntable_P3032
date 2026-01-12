@@ -310,9 +310,9 @@ void Display::showSplashScreen(float encoderAngle, uint16_t targetAngle, bool is
     if (lastEncoderAngle == 65535 || lastMotorEnabled != motorEnabled) {
       _lcd->setCursor(0, 0);
       if (motorEnabled) {
-        _lcd->print("   Motor:Hold ON   ");
+        _lcd->print("Motor:Hold ON");
       } else {
-        _lcd->print("   Motor:Released  ");
+        _lcd->print("Motor:Released");
       }
       if (_cols >= 20) _lcd->print("    ");
       lastMotorEnabled = motorEnabled;
@@ -434,7 +434,17 @@ void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
     lastTargetAngle = targetAngle;
     lastDigitMode = digitMode;
   } else {
-    return; // Нічого не змінилося
+    // Нічого не змінилося - виводимо тільки перший рядок
+    if (_rows >= 4) {
+      _lcd->setCursor(0, 0);
+      _lcd->print("Target: ");
+      if (targetAngle < 100) _lcd->print(' ');
+      if (targetAngle < 10) _lcd->print(' ');
+      _lcd->print(targetAngle);
+      _lcd->write((uint8_t)0);
+      if (_cols >= 20) _lcd->print("       ");
+    }
+    return;
   }
   
   // Визначаємо назву режиму розряду
@@ -447,10 +457,13 @@ void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
   
   if (_rows >= 4) {
     // LCD2004
-    // Перший рядок - завжди виводимо для надійності
+    // Перший рядок - виводимо завжди (як рядок 3 на першому екрані)
     _lcd->setCursor(0, 0);
-    _lcd->print("Target:");
-    printAt(9, 0, targetAngle);
+    _lcd->print("Target: ");
+    // Виводимо кут вручну для надійності
+    if (targetAngle < 100) _lcd->print(' ');
+    if (targetAngle < 10) _lcd->print(' ');
+    _lcd->print(targetAngle);
     _lcd->write((uint8_t)0);  // Кастомний символ градуса
     if (_cols >= 20) _lcd->print("       ");
     
@@ -464,7 +477,7 @@ void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
     }
     
     _lcd->setCursor(0, 3);
-    _lcd->print("Ok");
+    _lcd->print("Btn:Ok");
     if (_cols >= 20) _lcd->print("                  ");
   } else {
     // LCD1602
@@ -490,17 +503,9 @@ void Display::showSettingsMenu(uint8_t direction) {
   
   if (_rows >= 4) {
     // LCD2004
-    _lcd->setCursor(0, 0);
-    _lcd->print("Settings");
-    if (_cols >= 20) _lcd->print("            ");
-    
-    _lcd->setCursor(0, 1);
-    _lcd->print("Direction:");
-    if (_cols >= 20) _lcd->print("          ");
-    
     // Оновлюємо напрямок тільки якщо змінився
     if (directionChanged) {
-      _lcd->setCursor(0, 2);
+      _lcd->setCursor(0, 1);
       if (direction == 0) {
         _lcd->print("> CW  (Clockwise)");
         if (_cols >= 20) _lcd->print("  ");
@@ -511,8 +516,8 @@ void Display::showSettingsMenu(uint8_t direction) {
     }
     
     _lcd->setCursor(0, 3);
-    _lcd->print("Rotate to change");
-    if (_cols >= 20) _lcd->print("    ");
+    _lcd->print("Btn:Ok");
+    if (_cols >= 20) _lcd->print("                  ");
   } else {
     // LCD1602
     if (directionChanged) {
@@ -534,21 +539,13 @@ void Display::showSaveMenu() {
   // Тут просто відображаємо вміст
   
   if (_rows >= 4) {
-    _lcd->setCursor(0, 0);
+    _lcd->setCursor(0, 1);
     _lcd->print("Save Position");
     if (_cols >= 20) _lcd->print("        ");
     
-    _lcd->setCursor(0, 1);
-    _lcd->print("Current position");
-    if (_cols >= 20) _lcd->print("     ");
-    
-    _lcd->setCursor(0, 2);
-    _lcd->print("will be saved");
-    if (_cols >= 20) _lcd->print("       ");
-    
     _lcd->setCursor(0, 3);
-    _lcd->print("Press to confirm");
-    if (_cols >= 20) _lcd->print("    ");
+    _lcd->print("Btn:Ok");
+    if (_cols >= 20) _lcd->print("                  ");
   } else {
     _lcd->setCursor(0, 0);
     _lcd->print("Save Position");
