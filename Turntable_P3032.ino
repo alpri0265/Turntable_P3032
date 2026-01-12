@@ -60,6 +60,9 @@ void setup() {
   // Встановлюємо напрямок руху
   menu.setDirection((RotationDirection)savedDirection);
   
+  // Встановлюємо напрямок для stepper (інверсія для CCW)
+  stepper.setDirectionInvert(savedDirection == DIR_CCW);
+  
   // Встановлюємо нульову позицію двигуна
   menu.setStepperZeroPosition(savedStepperZero);
   
