@@ -324,7 +324,7 @@ void Display::showSplashScreen(float encoderAngle, uint16_t targetAngle, bool is
     }
     if (lastTargetAngle != targetAngle) {
       printAt(8, 2, targetAngle);
-      _lcd->print((char)223);
+      _lcd->write((uint8_t)0);  // Кастомний символ градуса
       if (_cols >= 20) _lcd->print("      ");
       lastTargetAngle = targetAngle;
     }
@@ -357,7 +357,7 @@ void Display::showSplashScreen(float encoderAngle, uint16_t targetAngle, bool is
       _lcd->setCursor(0, 1);
       _lcd->print("Tgt: ");
       printAt(5, 1, targetAngle);
-      _lcd->print((char)223);
+      _lcd->write((uint8_t)0);  // Кастомний символ градуса
       if (isRunning) {
         _lcd->print(" RUN");
       } else {
@@ -438,7 +438,7 @@ void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
     _lcd->setCursor(0, 1);
     _lcd->print("Target: ");
     printAt(8, 1, targetAngle);
-    _lcd->print((char)223);
+    _lcd->write((uint8_t)0);  // Кастомний символ градуса
     if (_cols >= 20) _lcd->print("      ");
     
     _lcd->setCursor(0, 2);
@@ -458,7 +458,7 @@ void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
     _lcd->setCursor(0, 0);
     _lcd->print("Tgt: ");
     printAt(5, 0, targetAngle);
-    _lcd->print((char)223);
+    _lcd->write((uint8_t)0);  // Кастомний символ градуса
     _lcd->print(" ");
     _lcd->print(modeName);
     
