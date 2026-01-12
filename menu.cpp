@@ -3,7 +3,7 @@
 Menu::Menu()
   : _currentMenu(MENU_SPLASH), _currentItem(0), _targetAngle(0),
     _targetPosition(0), _shouldSave(false), _manualAngleSet(false),
-    _shouldResetSplash(false), _shouldResetPosition(false), _lastAbsoluteAngle(999), _lastMenuChangeTime(0), _digitMode(DIGIT_UNITS), _selectedDirection(DIR_CW) {
+    _shouldResetSplash(false), _shouldResetPosition(false), _lastAbsoluteAngle(999), _lastMenuChangeTime(0), _digitMode(DIGIT_UNITS), _selectedDirection(DIR_CW), _stepperZeroPosition(0) {
 }
 
 int32_t Menu::angleToSteps(uint16_t angle) {
@@ -25,6 +25,12 @@ void Menu::updateTargetAngle(uint16_t absoluteAngle) {
       _lastAbsoluteAngle = absoluteAngle;
     }
     // Не оновлюємо цільовий кут - залишаємо встановлений вручну
+    // Але оновлюємо цільову позицію на основі збереженого кута
+    int32_t angleInSteps = angleToSteps(_targetAngle);
+    int32_t newTarget = _stepperZeroPosition + angleInSteps;
+    while (newTarget < 0) newTarget += STEPS_360;
+    while (newTarget >= STEPS_360) newTarget -= STEPS_360;
+    _targetPosition = newTarget;
     return;
   }
   
@@ -32,14 +38,17 @@ void Menu::updateTargetAngle(uint16_t absoluteAngle) {
   _targetAngle = absoluteAngle;
   _lastAbsoluteAngle = absoluteAngle;
   
-  // Конвертуємо кут в позицію (кроки)
-  int32_t newTarget = angleToSteps(absoluteAngle);
+  // Конвертуємо кут в позицію (кроки) відносно нульової позиції
+  int32_t angleInSteps = angleToSteps(absoluteAngle);
+  int32_t newTarget = _stepperZeroPosition + angleInSteps;
   
-  // Обмежуємо в межах дозволеного діапазону
-  if (newTarget < MIN_POS)
-    newTarget = MIN_POS;
-  else if (newTarget > MAX_POS)
-    newTarget = MAX_POS;
+  // Нормалізуємо до діапазону 0-360 градусів
+  while (newTarget < 0) {
+    newTarget += STEPS_360;
+  }
+  while (newTarget >= STEPS_360) {
+    newTarget -= STEPS_360;
+  }
   
   // Встановлюємо цільову позицію
   _targetPosition = newTarget;
@@ -49,6 +58,18 @@ void Menu::resetManualAngleFlag() {
   // Скидаємо прапорець ручного встановлення
   // Викликається, коли користувач обертає абсолютний енкодер значно
   _manualAngleSet = false;
+}
+
+void Menu::setStepperZeroPosition(int32_t zeroPosition) {
+  // Встановлюємо нульову позицію двигуна (відносно якої обчислюється цільовий кут)
+  // Нормалізуємо до діапазону 0-360 градусів
+  while (zeroPosition < 0) {
+    zeroPosition += STEPS_360;
+  }
+  while (zeroPosition >= STEPS_360) {
+    zeroPosition -= STEPS_360;
+  }
+  _stepperZeroPosition = zeroPosition;
 }
 
 void Menu::handleSplashMenu(bool buttonPressed, bool startButtonPressed) {
@@ -178,12 +199,17 @@ void Menu::handleSetAngleMenu(int16_t encoderDelta, bool buttonPressed) {
     
     _targetAngle = (uint16_t)newAngle;
     
-    // Оновлюємо цільову позицію
-    int32_t newTarget = angleToSteps(_targetAngle);
-    if (newTarget < MIN_POS)
-      newTarget = MIN_POS;
-    else if (newTarget > MAX_POS)
-      newTarget = MAX_POS;
+    // Оновлюємо цільову позицію відносно нульової позиції
+    int32_t angleInSteps = angleToSteps(_targetAngle);
+    int32_t newTarget = _stepperZeroPosition + angleInSteps;
+    
+    // Нормалізуємо до діапазону 0-360 градусів
+    while (newTarget < 0) {
+      newTarget += STEPS_360;
+    }
+    while (newTarget >= STEPS_360) {
+      newTarget -= STEPS_360;
+    }
     _targetPosition = newTarget;
     
     // Встановлюємо прапорець, що кут встановлений вручну
@@ -199,12 +225,17 @@ void Menu::setTargetAngle(uint16_t angle) {
   if (angle > 360) angle = 360;
   _targetAngle = angle;
   
-  // Оновлюємо цільову позицію
-  int32_t newTarget = angleToSteps(_targetAngle);
-  if (newTarget < MIN_POS)
-    newTarget = MIN_POS;
-  else if (newTarget > MAX_POS)
-    newTarget = MAX_POS;
+  // Оновлюємо цільову позицію відносно нульової позиції
+  int32_t angleInSteps = angleToSteps(_targetAngle);
+  int32_t newTarget = _stepperZeroPosition + angleInSteps;
+  
+  // Нормалізуємо до діапазону 0-360 градусів
+  while (newTarget < 0) {
+    newTarget += STEPS_360;
+  }
+  while (newTarget >= STEPS_360) {
+    newTarget -= STEPS_360;
+  }
   _targetPosition = newTarget;
   
   // Встановлюємо прапорець, що кут встановлений вручну

@@ -77,8 +77,9 @@ void loop() {
   
   // Читаємо абсолютний енкодер P3022-CW360 (встановлює цільовий кут)
   // Оновлюємо на сплеш-екрані та в інших меню (крім режиму редагування)
+  // НЕ оновлюємо цільовий кут коли двигун рухається (startStop.getState() == true)
   // updateTargetAngle сам перевіряє прапорець _manualAngleSet
-  if (menu.getCurrentMenu() == MENU_SPLASH || !menu.isEditingAngle()) {
+  if ((menu.getCurrentMenu() == MENU_SPLASH || !menu.isEditingAngle()) && !startStop.getState()) {
     uint16_t absoluteAngle = absoluteEncoder.readAngleInt();
     menu.updateTargetAngle(absoluteAngle);
   }
@@ -254,8 +255,23 @@ void loop() {
   
   // Обробка кнопки встановлення нуля абсолютного енкодера (працює на всіх екранах)
   if (encoderZeroButton.isPressed()) {
+    // Зберігаємо поточний цільовий кут (наприклад 100°) перед обнуленням
+    uint16_t savedTargetAngle = menu.getTargetAngle();
+    
+    // Зберігаємо поточну позицію двигуна як нульову
+    int32_t currentPosition = stepper.getPosition();
+    menu.setStepperZeroPosition(currentPosition);
+    
+    // Встановлюємо нуль енкодера (тепер кут 0°)
     absoluteEncoder.setZero();
-    display.showMessage("Encoder", "zero set");
+    
+    // Зберігаємо поточну позицію в пам'ять
+    memory.save(currentPosition);
+    
+    // Відновлюємо збережений цільовий кут (100°) - він залишається незмінним
+    menu.setTargetAngle(savedTargetAngle);
+    
+    display.showMessage("Encoder", "");
   }
   
   // Використовуємо напрямок з меню Settings (замість фізичного перемикача)
@@ -310,19 +326,48 @@ void loop() {
       lastTargetPosition = targetPosition;
     }
     
-    // Викликаємо move() тільки коли:
-    // 1. Двигун завершив попередній рух (getRemaining() == 0)
-    // 2. Є потреба в русі (stepsNeeded != 0)
-    // 3. Цільова позиція змінилася або це перший запуск
-    if (stepper.getRemaining() == 0) {
-      if (stepsNeeded != 0) {
-        // Двигун стоїть і потрібно рухатися - встановлюємо новий рух
-        stepper.move(stepsNeeded);
-        targetChanged = false;
-      } else if (abs(currentEffectivePosition - targetPosition) < 2) {
-        // Позиція досягнута - вимикаємо двигун
-        startStop.setState(false);
-        targetChanged = false;
+    // Перевіряємо, чи досягнуто цільовий кут за допомогою енкодера
+    // Це правильніша логіка - рухаємося поки енкодер не покаже потрібний кут
+    uint16_t currentEncoderAngle = absoluteEncoder.readAngleInt();
+    uint16_t targetAngle = menu.getTargetAngle();
+    
+    // Обчислюємо різницю між поточним та цільовим кутом (враховуючи круговий діапазон)
+    int16_t angleDiff = currentEncoderAngle - targetAngle;
+    if (angleDiff > 180) {
+      angleDiff -= 360;
+    } else if (angleDiff < -180) {
+      angleDiff += 360;
+    }
+    
+    // Якщо досягнуто цільовий кут (допуск ±2 градуси) - вимикаємо двигун
+    if (abs(angleDiff) <= 2) {
+      startStop.setState(false);
+      targetChanged = false;
+    } else {
+      // Якщо ще не досягли цільового кута енкодера - продовжуємо рух
+      // Обчислюємо кроки необхідні для руху до кута енкодера
+      // Використовуємо напрямок на основі різниці кутів
+      if (stepper.getRemaining() == 0) {
+        // Визначаємо напрямок руху на основі різниці кутів енкодера
+        int32_t stepsToMove = 0;
+        if (abs(angleDiff) > 2) {  // Якщо різниця більше 2 градусів
+          // Обчислюємо кроки на основі різниці кутів
+          // Якщо angleDiff > 0, потрібно рухатися назад (від'ємні кроки)
+          // Якщо angleDiff < 0, потрібно рухатися вперед (додатні кроки)
+          stepsToMove = -angleDiff * STEPS_360 / 360;  // Інвертуємо, бо angleDiff = current - target
+          
+          // Обмежуємо максимальну швидкість руху (не більше 180° за раз)
+          if (stepsToMove > STEPS_360 / 2) {
+            stepsToMove = STEPS_360 / 2;
+          } else if (stepsToMove < -STEPS_360 / 2) {
+            stepsToMove = -STEPS_360 / 2;
+          }
+          
+          if (abs(stepsToMove) > 0) {
+            stepper.move(stepsToMove);
+            targetChanged = false;
+          }
+        }
       }
     }
   } else {

@@ -3,7 +3,12 @@
 
 #include <Arduino.h>
 #include "config.h"
-#include "direction_switch.h"
+
+// Типи напрямку обертання
+enum RotationDirection {
+  DIR_CW = 0,   // За годинниковою стрілкою
+  DIR_CCW = 1   // Проти годинникової стрілки
+};
 
 // Типи меню
 enum MenuType {
@@ -81,6 +86,9 @@ public:
   // Отримання вибраного напрямку руху
   RotationDirection getDirection() const { return _selectedDirection; }
   
+  // Встановлення нульової позиції двигуна (викликається при обнуленні енкодера)
+  void setStepperZeroPosition(int32_t zeroPosition);
+  
   // Обробка довгого натискання кнопки (повернення на сплеш-екран)
   void handleLongPress();
   
@@ -96,6 +104,7 @@ private:
   uint16_t _lastAbsoluteAngle;  // Останнє значення абсолютного енкодера
   unsigned long _lastMenuChangeTime;  // Час останньої зміни пункту меню
   static const unsigned long MENU_CHANGE_DELAY_MS = 150;  // Затримка між змінами пунктів меню
+  int32_t _stepperZeroPosition;  // Нульова позиція двигуна (встановлюється при обнуленні енкодера)
   
   // Режими редагування розрядів кута
   enum DigitMode {
