@@ -181,14 +181,20 @@ void Display::drawWithTarget(uint32_t position, uint32_t steps360, uint16_t targ
 void Display::printMenuItem(uint8_t row, uint8_t itemIndex, const char* text, bool selected) {
   _lcd->setCursor(0, row);
   if (selected) {
-    _lcd->print(">");
+    // Для "Set Angle" (itemIndex == 0) - дві стрілки, для інших - одна
+    if (itemIndex == 0 && strcmp(text, "Set Angle") == 0) {
+      _lcd->print(">>");
+    } else {
+      _lcd->print(">");
+    }
   } else {
     _lcd->print(" ");
   }
   _lcd->print(text);
   // Очищаємо решту рядка
   uint8_t len = strlen(text);
-  for (uint8_t i = len + 1; i < _cols; i++) {
+  uint8_t arrowLen = (selected && itemIndex == 0 && strcmp(text, "Set Angle") == 0) ? 2 : 1;
+  for (uint8_t i = len + arrowLen; i < _cols; i++) {
     _lcd->print(" ");
   }
 }
@@ -312,11 +318,7 @@ void Display::showMainMenu(uint8_t selectedItem) {
     printMenuItem(2, 1, "Settings", selectedItem == 1);
     
     // Рядок 3: показуємо Save Position
-    if (selectedItem == 2) {
-      printMenuItem(3, 2, "Save Position", true);
-    } else {
-      printMenuItem(3, 2, "Save Position", false);
-    }
+    printMenuItem(3, 2, "Save Position", selectedItem == 2);
   } else {
     // LCD1602 - показуємо по 2 пункти
     if (selectedItem == 0) {
