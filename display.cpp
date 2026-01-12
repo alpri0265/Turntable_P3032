@@ -276,6 +276,40 @@ void Display::showStatusMenu(uint32_t position, uint32_t steps360, uint16_t targ
   }
 }
 
+void Display::showSetAngleMenu(uint16_t targetAngle) {
+  _lcd->clear();
+  
+  if (_rows >= 4) {
+    // LCD2004
+    _lcd->setCursor(0, 0);
+    _lcd->print("Set Target Angle");
+    if (_cols >= 20) _lcd->print("    ");
+    
+    _lcd->setCursor(0, 1);
+    _lcd->print("Target: ");
+    printAt(8, 1, targetAngle);
+    _lcd->print((char)223);
+    if (_cols >= 20) _lcd->print("      ");
+    
+    _lcd->setCursor(0, 2);
+    _lcd->print("Rotate encoder to");
+    if (_cols >= 20) _lcd->print("   ");
+    
+    _lcd->setCursor(0, 3);
+    _lcd->print("change angle");
+    if (_cols >= 20) _lcd->print("        ");
+  } else {
+    // LCD1602
+    _lcd->setCursor(0, 0);
+    _lcd->print("Set Angle:");
+    printAt(10, 0, targetAngle);
+    _lcd->print((char)223);
+    
+    _lcd->setCursor(0, 1);
+    _lcd->print("Rotate & press");
+  }
+}
+
 void Display::showSettingsMenu() {
   _lcd->clear();
   

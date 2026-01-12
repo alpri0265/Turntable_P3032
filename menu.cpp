@@ -2,7 +2,8 @@
 
 Menu::Menu() 
   : _currentMenu(MENU_MAIN), _currentItem(0), _targetAngle(0), 
-    _targetPosition(0), _shouldSave(false) {
+    _targetPosition(0), _shouldSave(false), _manualAngleSet(false),
+    _lastAbsoluteAngle(999) {
 }
 
 int32_t Menu::angleToSteps(uint16_t angle) {
@@ -11,8 +12,38 @@ int32_t Menu::angleToSteps(uint16_t angle) {
 }
 
 void Menu::updateTargetAngle(uint16_t absoluteAngle) {
-  // Встановлюємо цільовий кут з абсолютного енкодера
+  // Якщо активний режим редагування через меню - не оновлюємо
+  if (_currentMenu == MENU_SET_ANGLE) {
+    return;
+  }
+  
+  // Якщо кут був встановлений вручну, перевіряємо чи абсолютний енкодер змінився значно
+  if (_manualAngleSet) {
+    // Якщо це перше читання - зберігаємо значення
+    if (_lastAbsoluteAngle == 999) {
+      _lastAbsoluteAngle = absoluteAngle;
+      return;
+    }
+    
+    // Обчислюємо різницю (враховуючи перехід через 0/360)
+    int16_t diff1 = abs((int16_t)absoluteAngle - (int16_t)_lastAbsoluteAngle);
+    int16_t diff2 = 360 - diff1;
+    int16_t diff = (diff1 < diff2) ? diff1 : diff2;
+    
+    // Якщо абсолютний енкодер змінився більше ніж на 5 градусів - скидаємо прапорець
+    if (diff > 5) {
+      _manualAngleSet = false;
+      _lastAbsoluteAngle = absoluteAngle;
+      // Продовжуємо оновлення кута
+    } else {
+      // Невелика зміна - не оновлюємо кут
+      return;
+    }
+  }
+  
+  // Оновлюємо кут з абсолютного енкодера
   _targetAngle = absoluteAngle;
+  _lastAbsoluteAngle = absoluteAngle;
   
   // Конвертуємо кут в позицію (кроки)
   int32_t newTarget = angleToSteps(absoluteAngle);
@@ -27,6 +58,12 @@ void Menu::updateTargetAngle(uint16_t absoluteAngle) {
   _targetPosition = newTarget;
 }
 
+void Menu::resetManualAngleFlag() {
+  // Скидаємо прапорець ручного встановлення
+  // Викликається, коли користувач обертає абсолютний енкодер значно
+  _manualAngleSet = false;
+}
+
 void Menu::updateNavigation(int16_t encoderDelta, bool buttonPressed) {
   // Обробка навігації залежно від поточного меню
   switch (_currentMenu) {
@@ -35,6 +72,9 @@ void Menu::updateNavigation(int16_t encoderDelta, bool buttonPressed) {
       break;
     case MENU_STATUS:
       handleStatusMenu(buttonPressed);
+      break;
+    case MENU_SET_ANGLE:
+      handleSetAngleMenu(encoderDelta, buttonPressed);
       break;
     case MENU_SETTINGS:
       handleSettingsMenu(encoderDelta, buttonPressed);
@@ -74,11 +114,62 @@ void Menu::handleMainMenu(int16_t encoderDelta, bool buttonPressed) {
 }
 
 void Menu::handleStatusMenu(bool buttonPressed) {
-  // Повернення до головного меню
+  // При натисканні кнопки входимо в режим редагування кута
   if (buttonPressed) {
-    _currentMenu = MENU_MAIN;
-    _currentItem = ITEM_STATUS;
+    _currentMenu = MENU_SET_ANGLE;
   }
+}
+
+void Menu::handleSetAngleMenu(int16_t encoderDelta, bool buttonPressed) {
+  // Редагування кута через інкрементальний енкодер
+  if (encoderDelta != 0) {
+    // Змінюємо кут з кроком 1 градус
+    int32_t newAngle = (int32_t)_targetAngle + encoderDelta;
+    
+    // Обмежуємо в межах 0-360
+    if (newAngle < 0) {
+      newAngle = 360;
+    } else if (newAngle > 360) {
+      newAngle = 0;
+    }
+    
+    _targetAngle = (uint16_t)newAngle;
+    
+    // Оновлюємо цільову позицію
+    int32_t newTarget = angleToSteps(_targetAngle);
+    if (newTarget < MIN_POS)
+      newTarget = MIN_POS;
+    else if (newTarget > MAX_POS)
+      newTarget = MAX_POS;
+    _targetPosition = newTarget;
+    
+    // Встановлюємо прапорець, що кут встановлений вручну
+    _manualAngleSet = true;
+  }
+  
+  // При натисканні кнопки зберігаємо та повертаємось до статусу
+  if (buttonPressed) {
+    // Встановлюємо прапорець, що кут встановлений вручну
+    _manualAngleSet = true;
+    _currentMenu = MENU_STATUS;
+  }
+}
+
+void Menu::setTargetAngle(uint16_t angle) {
+  // Встановлюємо кут вручну
+  if (angle > 360) angle = 360;
+  _targetAngle = angle;
+  
+  // Оновлюємо цільову позицію
+  int32_t newTarget = angleToSteps(_targetAngle);
+  if (newTarget < MIN_POS)
+    newTarget = MIN_POS;
+  else if (newTarget > MAX_POS)
+    newTarget = MAX_POS;
+  _targetPosition = newTarget;
+  
+  // Встановлюємо прапорець, що кут встановлений вручну
+  _manualAngleSet = true;
 }
 
 void Menu::handleSettingsMenu(int16_t encoderDelta, bool buttonPressed) {

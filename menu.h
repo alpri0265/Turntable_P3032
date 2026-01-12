@@ -8,6 +8,7 @@
 enum MenuType {
   MENU_MAIN,           // Головне меню
   MENU_STATUS,         // Статус системи
+  MENU_SET_ANGLE,      // Встановлення кута (редагування)
   MENU_SETTINGS,       // Налаштування
   MENU_SAVE            // Збереження
 };
@@ -28,7 +29,14 @@ public:
   void updateNavigation(int16_t encoderDelta, bool buttonPressed);
   
   // Оновлення цільового кута з абсолютного енкодера
+  // Оновлює кут тільки якщо він не був встановлений вручну
   void updateTargetAngle(uint16_t absoluteAngle);
+  
+  // Скидання прапорця ручного встановлення (для абсолютного енкодера)
+  void resetManualAngleFlag();
+  
+  // Встановлення цільового кута вручну (з меню)
+  void setTargetAngle(uint16_t angle);
   
   // Отримання поточного типу меню
   MenuType getCurrentMenu() const { return _currentMenu; }
@@ -38,6 +46,9 @@ public:
   
   // Отримання цільового кута
   uint16_t getTargetAngle() const { return _targetAngle; }
+  
+  // Перевірка, чи активний режим редагування кута
+  bool isEditingAngle() const { return _currentMenu == MENU_SET_ANGLE; }
   
   // Отримання цільової позиції в кроках
   int32_t getTargetPosition() const { return _targetPosition; }
@@ -55,10 +66,13 @@ private:
   uint16_t _targetAngle;
   int32_t _targetPosition;
   bool _shouldSave;
+  bool _manualAngleSet;  // Прапорець, що кут встановлений вручну
+  uint16_t _lastAbsoluteAngle;  // Останнє значення абсолютного енкодера
   
   int32_t angleToSteps(uint16_t angle);
   void handleMainMenu(int16_t encoderDelta, bool buttonPressed);
   void handleStatusMenu(bool buttonPressed);
+  void handleSetAngleMenu(int16_t encoderDelta, bool buttonPressed);
   void handleSettingsMenu(int16_t encoderDelta, bool buttonPressed);
   void handleSaveMenu(bool buttonPressed);
 };

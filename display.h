@@ -30,6 +30,7 @@ public:
   // Відображення меню
   void showMainMenu(uint8_t selectedItem);
   void showStatusMenu(uint32_t position, uint32_t steps360, uint16_t targetAngle, bool positionReached, bool directionCCW);
+  void showSetAngleMenu(uint16_t targetAngle);
   void showSettingsMenu();
   void showSaveMenu();
   

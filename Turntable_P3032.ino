@@ -60,8 +60,12 @@ void loop() {
   int16_t encoderDelta = encoder.read();
   
   // Читаємо абсолютний енкодер P3022-CW360 (встановлює цільовий кут)
-  uint16_t absoluteAngle = absoluteEncoder.readAngleInt();
-  menu.updateTargetAngle(absoluteAngle);
+  // Тільки якщо не активний режим редагування через меню
+  // updateTargetAngle сам перевіряє прапорець _manualAngleSet
+  if (!menu.isEditingAngle()) {
+    uint16_t absoluteAngle = absoluteEncoder.readAngleInt();
+    menu.updateTargetAngle(absoluteAngle);
+  }
   
   // Перевіряємо кнопку
   bool buttonPressed = button.isPressed();
@@ -137,6 +141,10 @@ void loop() {
               directionCCW
             );
           }
+          break;
+          
+        case MENU_SET_ANGLE:
+          display.showSetAngleMenu(menu.getTargetAngle());
           break;
           
         case MENU_SETTINGS:

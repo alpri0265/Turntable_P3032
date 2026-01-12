@@ -6,7 +6,7 @@ DirectionSwitch::DirectionSwitch(uint8_t pin)
 
 void DirectionSwitch::begin() {
   pinMode(_pin, INPUT_PULLUP);
-  // Читаємо початковий стан
+  // Читаємо початковий стан тумблера
   _direction = (digitalRead(_pin) == LOW) ? DIR_CW : DIR_CCW;
   _lastDirection = _direction;
 }
@@ -14,10 +14,9 @@ void DirectionSwitch::begin() {
 RotationDirection DirectionSwitch::read() {
   unsigned long now = millis();
   
-  // Читаємо стан перемикача (з debounce)
+  // Читаємо стан тумблера (з debounce)
   if (now - _lastReadTime >= READ_INTERVAL_MS) {
     // LOW = CW (за годинниковою), HIGH = CCW (проти годинникової)
-    // (залежить від підключення, можна інвертувати)
     _direction = (digitalRead(_pin) == LOW) ? DIR_CW : DIR_CCW;
     _lastReadTime = now;
   }
