@@ -43,6 +43,15 @@ void Display::printAt(uint8_t col, uint8_t row, uint16_t value) {
   _lcd->print(value);
 }
 
+void Display::printAt(uint8_t col, uint8_t row, float value, uint8_t decimals) {
+  _lcd->setCursor(col, row);
+  // Обмежуємо значення до 0-360
+  if (value < 0.0) value = 0.0;
+  if (value >= 360.0) value = 359.99;
+  // Форматуємо з заданою кількістю знаків після коми
+  _lcd->print(value, decimals);
+}
+
 void Display::update(uint32_t position, uint32_t steps360) {
   unsigned long now = millis();
   
@@ -228,8 +237,8 @@ void Display::resetSplashScreen() {
   _splashNeedReset = true;
 }
 
-void Display::showSplashScreen(uint16_t encoderAngle, uint16_t targetAngle, bool isRunning, bool motorEnabled) {
-  static uint16_t lastEncoderAngle = 65535;
+void Display::showSplashScreen(float encoderAngle, uint16_t targetAngle, bool isRunning, bool motorEnabled) {
+  static float lastEncoderAngle = -1.0;
   static uint16_t lastTargetAngle = 65535;
   static bool lastIsRunning = false;
   static bool lastMotorEnabled = true;
@@ -239,7 +248,7 @@ void Display::showSplashScreen(uint16_t encoderAngle, uint16_t targetAngle, bool
   if (_splashNeedReset) {
     firstDisplay = true;
     _splashNeedReset = false;
-    lastEncoderAngle = 65535;
+    lastEncoderAngle = -1.0;
     lastTargetAngle = 65535;
     lastIsRunning = !isRunning;
     lastMotorEnabled = !motorEnabled;  // Примусово оновити
@@ -248,7 +257,7 @@ void Display::showSplashScreen(uint16_t encoderAngle, uint16_t targetAngle, bool
   if (firstDisplay) {
     _lcd->clear();
     firstDisplay = false;
-    lastEncoderAngle = 65535; // Примусово оновити
+    lastEncoderAngle = -1.0; // Примусово оновити
     lastTargetAngle = 65535;
     lastIsRunning = !isRunning;
     lastMotorEnabled = !motorEnabled;  // Примусово оновити
@@ -269,12 +278,14 @@ void Display::showSplashScreen(uint16_t encoderAngle, uint16_t targetAngle, bool
     }
 
     // Кут з абсолютного енкодера (поточний стан)
-    if (lastEncoderAngle == 65535) {
+    if (lastEncoderAngle < 0.0) {
       _lcd->setCursor(0, 1);
       _lcd->print("Encoder: ");
     }
-    if (lastEncoderAngle != encoderAngle) {
-      printAt(9, 1, encoderAngle);
+    // Оновлюємо якщо змінився кут (з невеликою толерантністю для float)
+    float diff = (lastEncoderAngle < 0.0) ? 1.0 : ((encoderAngle > lastEncoderAngle) ? (encoderAngle - lastEncoderAngle) : (lastEncoderAngle - encoderAngle));
+    if (lastEncoderAngle < 0.0 || diff > 0.01f) {
+      printAt(9, 1, encoderAngle, 2);
       _lcd->print((char)223);
       if (_cols >= 20) _lcd->print("      ");
       lastEncoderAngle = encoderAngle;
@@ -306,10 +317,11 @@ void Display::showSplashScreen(uint16_t encoderAngle, uint16_t targetAngle, bool
   } else {
     // LCD1602
     // Кут з абсолютного енкодера
-    if (lastEncoderAngle == 65535 || lastEncoderAngle != encoderAngle) {
+    float diff = (lastEncoderAngle < 0.0) ? 1.0 : ((encoderAngle > lastEncoderAngle) ? (encoderAngle - lastEncoderAngle) : (lastEncoderAngle - encoderAngle));
+    if (lastEncoderAngle < 0.0 || diff > 0.01f) {
       _lcd->setCursor(0, 0);
       _lcd->print("Enc: ");
-      printAt(5, 0, encoderAngle);
+      printAt(5, 0, encoderAngle, 2);
       _lcd->print((char)223);
       lastEncoderAngle = encoderAngle;
     }

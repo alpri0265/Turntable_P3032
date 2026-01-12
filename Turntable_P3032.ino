@@ -14,6 +14,7 @@ AbsoluteEncoder absoluteEncoder(ABS_ENC_PIN, 5.0, 360.0);
 Button button(ENC_BTN, BUTTON_DEBOUNCE_MS);
 Button digitModeButton(DIGIT_MODE_BUTTON_PIN, BUTTON_DEBOUNCE_MS);
 Button encoderZeroButton(ENCODER_ZERO_BUTTON_PIN, BUTTON_DEBOUNCE_MS);  // Кнопка встановлення нуля енкодера
+Button stepFineAdjustButton(STEP_FINE_ADJUST_BUTTON_PIN, BUTTON_DEBOUNCE_MS);  // Кнопка руху на один крок
 
 #if LCD_MODE == 0
   // 4-bit режим
@@ -38,6 +39,7 @@ void setup() {
   button.begin();
   digitModeButton.begin();
   encoderZeroButton.begin();  // Кнопка встановлення нуля енкодера
+  stepFineAdjustButton.begin();  // Кнопка руху на один крок
   display.begin();
   stepper.begin();
   startStop.begin();
@@ -71,7 +73,7 @@ void setup() {
   menu.updateTargetAngle(initialAngle);
   
   // Показуємо початковий екран (сплеш-екран)
-  uint16_t initialEncoderAngle = absoluteEncoder.readAngleInt();
+  float initialEncoderAngle = absoluteEncoder.readAngle();
   display.showSplashScreen(initialEncoderAngle, menu.getTargetAngle(), false, stepper.isEnabled());
 }
 
@@ -316,6 +318,34 @@ void loop() {
     display.showMessage("Encoder", "");
   }
   
+  // Обробка кнопки руху на один крок (для точного регулювання кута)
+  static unsigned long stepButtonPressStartTime = 0;
+  static bool stepButtonWasPressed = false;
+  static unsigned long lastStepTime = 0;
+  unsigned long currentTime = millis();
+  bool stepButtonCurrentlyPressed = stepFineAdjustButton.isCurrentlyPressed();
+  
+  if (stepButtonCurrentlyPressed && !stepButtonWasPressed) {
+    // Початок натискання - виконуємо один крок та фіксуємо час
+    stepper.move(1);
+    stepButtonPressStartTime = currentTime;
+    stepButtonWasPressed = true;
+    lastStepTime = currentTime;
+  } else if (stepButtonCurrentlyPressed && stepButtonWasPressed) {
+    // Кнопка утримується - перевіряємо чи настав час швидкого повторення
+    unsigned long pressDuration = currentTime - stepButtonPressStartTime;
+    if (pressDuration >= STEP_BUTTON_LONG_PRESS_MS) {
+      // Довге натискання - швидке повторення кроків
+      if (currentTime - lastStepTime >= STEP_BUTTON_REPEAT_DELAY_MS) {
+        stepper.move(1);
+        lastStepTime = currentTime;
+      }
+    }
+  } else if (!stepButtonCurrentlyPressed && stepButtonWasPressed) {
+    // Кнопка відпущена
+    stepButtonWasPressed = false;
+  }
+  
   // Використовуємо напрямок з меню Settings (замість фізичного перемикача)
   RotationDirection currentDirection = menu.getDirection();
   stepper.setDirectionInvert(currentDirection == DIR_CCW);
@@ -475,7 +505,7 @@ void loop() {
             }
             
             // Показуємо кут з абсолютного енкодера та цільовий кут
-            uint16_t encoderAngle = absoluteEncoder.readAngleInt();
+            float encoderAngle = absoluteEncoder.readAngle();
             display.showSplashScreen(
               encoderAngle,
               menu.getTargetAngle(),

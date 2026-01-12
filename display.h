@@ -28,7 +28,7 @@ public:
   void clear();
   
   // Відображення меню
-  void showSplashScreen(uint16_t encoderAngle, uint16_t targetAngle, bool isRunning, bool motorEnabled);
+  void showSplashScreen(float encoderAngle, uint16_t targetAngle, bool isRunning, bool motorEnabled);
   void resetSplashScreen(); // Скидання стану сплеш-екрану при поверненні
   void showMainMenu(uint8_t selectedItem);
   void showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode);
@@ -56,6 +56,7 @@ private:
   void drawWithTarget(uint32_t position, uint32_t steps360, uint16_t targetAngle);
   void printAt(uint8_t col, uint8_t row, const char* text);
   void printAt(uint8_t col, uint8_t row, uint16_t value);
+  void printAt(uint8_t col, uint8_t row, float value, uint8_t decimals = 2);
   void printMenuItem(uint8_t row, uint8_t itemIndex, const char* text, bool selected);
 };
 
