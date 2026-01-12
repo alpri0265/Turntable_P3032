@@ -26,6 +26,9 @@ Display::Display(uint8_t i2cAddress, uint8_t cols, uint8_t rows)
 void Display::begin() {
   _lcd->begin(_cols, _rows);
   
+  // Затримка для ініціалізації дисплея (особливо важливо для I2C)
+  delay(50);
+  
   // Створюємо кастомний символ градуса (0) в CGRAM
   // Символ градуса: маленьке коло вгорі
   uint8_t degreeChar[8] = {
@@ -40,7 +43,17 @@ void Display::begin() {
   };
   _lcd->createChar(0, degreeChar);
   
+  // Затримка після createChar (може зміщувати курсор)
+  delay(10);
+  
   _lcd->clear();
+  
+  // Затримка після clear (особливо важливо для I2C)
+  delay(10);
+  
+  // Явно встановлюємо курсор на початок після clear
+  _lcd->setCursor(0, 0);
+  
   #if LCD_MODE == 1
   _lcd->backlight();
   #endif
@@ -259,10 +272,12 @@ void Display::showSplashScreen(float encoderAngle, uint16_t targetAngle, bool is
   static bool lastIsRunning = false;
   static bool lastMotorEnabled = true;
   static bool firstDisplay = true;
+  static bool firstRow3Display = true;  // Для першого відображення рядка 3
   
   // Якщо потрібно скинути (викликано resetSplashScreen) - робимо це
   if (_splashNeedReset) {
     firstDisplay = true;
+    firstRow3Display = true;
     _splashNeedReset = false;
     lastEncoderAngle = -1.0;
     filteredEncoderAngle = -1.0;
@@ -295,11 +310,11 @@ void Display::showSplashScreen(float encoderAngle, uint16_t targetAngle, bool is
     if (lastEncoderAngle == 65535 || lastMotorEnabled != motorEnabled) {
       _lcd->setCursor(0, 0);
       if (motorEnabled) {
-        _lcd->print("Motor: Hold ON ");
+        _lcd->print("   Motor:Hold ON   ");
       } else {
-        _lcd->print("Motor: Released");
+        _lcd->print("   Motor:Released  ");
       }
-      if (_cols >= 20) _lcd->print("   ");
+      if (_cols >= 20) _lcd->print("    ");
       lastMotorEnabled = motorEnabled;
     }
 
@@ -329,17 +344,18 @@ void Display::showSplashScreen(float encoderAngle, uint16_t targetAngle, bool is
       lastTargetAngle = targetAngle;
     }
 
-    // Стан та інструкції
-    if (lastIsRunning != isRunning) {
-      _lcd->setCursor(0, 3);
-      if (isRunning) {
-        _lcd->print("Status: RUNNING");
-      } else {
-        _lcd->print("Btn: Start/Menu");
-      }
-      if (_cols >= 20) _lcd->print("    ");
-      lastIsRunning = isRunning;
+    // Стан та інструкції (рядок 3) - завжди виводимо для надійності
+    _lcd->setCursor(0, 3);
+    if (isRunning) {
+      _lcd->print("Status: RUNNING    ");
+    } else {
+      _lcd->print("Menu:Ok Btn:Start  ");
     }
+    // Заповнюємо решту рядка пробілами
+    if (_cols >= 20) {
+      _lcd->print(" ");
+    }
+    lastIsRunning = isRunning;
   } else {
     // LCD1602
     // Кут з абсолютного енкодера
@@ -432,14 +448,10 @@ void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
   if (_rows >= 4) {
     // LCD2004
     _lcd->setCursor(0, 0);
-    _lcd->print("Set Target Angle");
-    if (_cols >= 20) _lcd->print("    ");
-    
-    _lcd->setCursor(0, 1);
-    _lcd->print("Target: ");
-    printAt(8, 1, targetAngle);
+    _lcd->print("Target:");
+    printAt(11, 0, targetAngle);
     _lcd->write((uint8_t)0);  // Кастомний символ градуса
-    if (_cols >= 20) _lcd->print("      ");
+    if (_cols >= 20) _lcd->print("       ");
     
     _lcd->setCursor(0, 2);
     _lcd->print("Mode: ");
@@ -451,8 +463,8 @@ void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
     }
     
     _lcd->setCursor(0, 3);
-    _lcd->print("Btn: Change mode");
-    if (_cols >= 20) _lcd->print("     ");
+    _lcd->print("Btn:Ok");
+    if (_cols >= 20) _lcd->print("                  ");
   } else {
     // LCD1602
     _lcd->setCursor(0, 0);
