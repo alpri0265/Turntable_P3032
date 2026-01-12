@@ -76,5 +76,6 @@
 #define LCD_UPDATE_MS 100  // інтервал оновлення LCD
 #define BUTTON_DEBOUNCE_MS 50  // затримка для кнопки (зменшено для кращої відповіді)
 #define SAVE_MESSAGE_MS 400     // час показу повідомлення про збереження
+#define LONG_PRESS_THRESHOLD_MS 2000 // Час для довгого натискання кнопки енкодера (мс) - 2 секунди
 
 #endif

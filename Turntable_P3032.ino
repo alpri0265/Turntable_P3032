@@ -124,7 +124,7 @@ void loop() {
       // Якщо було довге натискання - не переходимо в меню
       if (longPressDetected) {
         longPressDetected = false;
-      } else if (pressDuration < 2000 && pressDuration > 50) {
+      } else if (pressDuration < LONG_PRESS_THRESHOLD_MS && pressDuration > BUTTON_DEBOUNCE_MS) {
         // Коротке натискання (більше 50мс для debounce, менше 2 секунд) - переходимо в меню
         menu.handleSplashMenu(true, false); // Перехід в меню
       }
@@ -150,12 +150,48 @@ void loop() {
     static MenuType lastMenu = MENU_SPLASH;
     MenuType currentMenuBefore = menu.getCurrentMenu();
     
-    // Перевіряємо кнопку енкодера безпосередньо перед використанням
-    // Це важливо, бо isPressed() повертає true тільки один раз при натисканні
-    bool buttonPressed = button.isPressed();
+    // ========== ОБРОБКА КНОПКИ ЕНКОДЕРА ДЛЯ МЕНЮ ==========
+    static unsigned long buttonPressStartTimeMenu = 0;
+    static bool buttonWasPressedMenu = false;
+    static bool longPressHandledMenu = false;
     
-    // Оновлюємо навігацію по меню (інкрементальний енкодер + кнопка)
-    menu.updateNavigation(encoderDelta, buttonPressed);
+    bool buttonCurrentlyPressed = !digitalRead(ENC_BTN); // Пряме читання піну для довгого натискання
+    
+    // Відстежуємо натискання кнопки
+    if (buttonCurrentlyPressed && !buttonWasPressedMenu) {
+      buttonPressStartTimeMenu = millis();
+      buttonWasPressedMenu = true;
+      longPressHandledMenu = false;
+    }
+    
+    // Перевіряємо довге натискання (2 секунди)
+    if (buttonCurrentlyPressed && buttonWasPressedMenu && !longPressHandledMenu) {
+      unsigned long pressDuration = millis() - buttonPressStartTimeMenu;
+      if (pressDuration >= LONG_PRESS_THRESHOLD_MS) {
+        // ДОВГЕ НАТИСКАННЯ - повернення на сплеш-екран
+        longPressHandledMenu = true;
+        menu.handleLongPress();
+        display.resetSplashScreen();
+        menu.clearResetSplashFlag();
+        lastDisplayUpdate = 0;
+        buttonWasPressedMenu = false;
+      }
+    }
+    
+    if (!buttonCurrentlyPressed) {
+      buttonWasPressedMenu = false;
+      longPressHandledMenu = false;
+    }
+    
+    // КОРОТКЕ натискання через debounce (якщо не було довгого)
+    bool buttonPressed = button.isPressed();
+    if (buttonPressed && !longPressHandledMenu) {
+      // Оновлюємо навігацію по меню (інкрементальний енкодер + кнопка)
+      menu.updateNavigation(encoderDelta, true);
+    } else {
+      // Оновлюємо тільки навігацію енкодером
+      menu.updateNavigation(encoderDelta, false);
+    }
     
     // Перевіряємо, чи змінилося меню на сплеш-екран
     MenuType currentMenuAfter = menu.getCurrentMenu();

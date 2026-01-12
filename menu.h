@@ -16,11 +16,10 @@ enum MenuType {
 
 // Пункти головного меню
 enum MainMenuItem {
-  ITEM_HOME = 0,       // Повернення на стартовий екран
-  ITEM_SET_ANGLE = 1,  // Встановлення кута
-  ITEM_SETTINGS = 2,
-  ITEM_SAVE = 3,
-  ITEM_COUNT = 4
+  ITEM_SET_ANGLE = 0,  // Встановлення кута
+  ITEM_SETTINGS = 1,
+  ITEM_SAVE = 2,
+  ITEM_COUNT = 3
 };
 
 class Menu {
@@ -81,6 +80,9 @@ public:
 
   // Отримання вибраного напрямку руху
   RotationDirection getDirection() const { return _selectedDirection; }
+  
+  // Обробка довгого натискання кнопки (повернення на сплеш-екран)
+  void handleLongPress();
   
 private:
   MenuType _currentMenu;

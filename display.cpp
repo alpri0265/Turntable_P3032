@@ -308,31 +308,26 @@ void Display::showMainMenu(uint8_t selectedItem) {
     _lcd->print("Main Menu");
     if (_cols >= 20) _lcd->print("           ");
     
-    printMenuItem(1, 0, "Home", selectedItem == 0);
-    printMenuItem(2, 1, "Set Angle", selectedItem == 1);
+    printMenuItem(1, 0, "Set Angle", selectedItem == 0);
+    printMenuItem(2, 1, "Settings", selectedItem == 1);
     
-    // Рядок 3: показуємо Settings або Save Position залежно від вибору
-    if (selectedItem == 3) {
-      // Якщо вибрано Save Position - показуємо його на рядку 3 замість Settings
-      printMenuItem(3, 3, "Save Position", true);
+    // Рядок 3: показуємо Save Position
+    if (selectedItem == 2) {
+      printMenuItem(3, 2, "Save Position", true);
     } else {
-      // Інакше завжди показуємо Settings на рядку 3
-      printMenuItem(3, 2, "Settings", selectedItem == 2);
+      printMenuItem(3, 2, "Save Position", false);
     }
   } else {
     // LCD1602 - показуємо по 2 пункти
     if (selectedItem == 0) {
-      printMenuItem(0, 0, "Home", true);
-      printMenuItem(1, 1, "Set Angle", false);
+      printMenuItem(0, 0, "Set Angle", true);
+      printMenuItem(1, 1, "Settings", false);
     } else if (selectedItem == 1) {
-      printMenuItem(0, 0, "Home", false);
-      printMenuItem(1, 1, "Set Angle", true);
-    } else if (selectedItem == 2) {
-      printMenuItem(0, 1, "Set Angle", false);
-      printMenuItem(1, 2, "Settings", true);
+      printMenuItem(0, 0, "Set Angle", false);
+      printMenuItem(1, 1, "Settings", true);
     } else {
-      printMenuItem(0, 2, "Settings", false);
-      printMenuItem(1, 3, "Save Position", true);
+      printMenuItem(0, 1, "Settings", false);
+      printMenuItem(1, 2, "Save Position", true);
     }
   }
 }

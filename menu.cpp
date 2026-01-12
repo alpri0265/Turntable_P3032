@@ -112,17 +112,6 @@ void Menu::handleMainMenu(int16_t encoderDelta, bool buttonPressed) {
     _lastMenuChangeTime = now;
     
     switch (_currentItem) {
-      case ITEM_HOME:
-        {
-          // Змінюємо меню на сплеш-екран
-          _currentMenu = MENU_SPLASH;
-          _currentItem = 0;
-          // Завжди встановлюємо прапорець для скидання сплеш-екрану
-          _shouldResetSplash = true;
-          // Повертаємося одразу, щоб перехід спрацював
-          return;
-        }
-        break;
       case ITEM_SET_ANGLE:
         _currentMenu = MENU_SET_ANGLE;
         break;
@@ -257,4 +246,21 @@ bool Menu::isPositionReached(int32_t currentPos, int32_t remaining) const {
   
   // Вважаємо досягнутою, якщо різниця менше 2 кроків
   return diff < 2;
+}
+
+void Menu::handleLongPress() {
+  // Довге натискання в будь-якому меню (крім сплеш-екрану) - повертаємося на сплеш-екран
+  if (_currentMenu != MENU_SPLASH) {
+    // Зберігаємо інформацію про те, чи були в меню Set Angle (перед зміною меню)
+    bool wasInSetAngle = (_currentMenu == MENU_SET_ANGLE);
+    
+    _currentMenu = MENU_SPLASH;
+    _currentItem = 0;
+    _shouldResetSplash = true;
+    
+    // Зберігаємо встановлений вручну кут, якщо були в меню Set Angle
+    if (wasInSetAngle) {
+      // _manualAngleSet залишається true
+    }
+  }
 }
