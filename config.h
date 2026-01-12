@@ -2,7 +2,7 @@
 #define CONFIG_H
 
 /* ================== ПІНИ ================== */
-// LCD1602 (4-bit)
+// LCD 4-bit mode (для LCD1602 або LCD2004)
 #define LCD_RS 8
 #define LCD_E  9
 #define LCD_D4 10
@@ -10,10 +10,25 @@
 #define LCD_D6 12
 #define LCD_D7 13
 
-// Encoder
+// LCD I2C mode (для LCD1602 або LCD2004 з I2C модулем)
+#define LCD_I2C_ADDRESS 0x27  // Стандартна адреса I2C (може бути 0x3F)
+#define LCD_I2C_SDA 20         // SDA для Arduino Mega (SDA)
+#define LCD_I2C_SCL 21         // SCL для Arduino Mega (SCL)
+
+/* ================== LCD НАЛАШТУВАННЯ ================== */
+// Виберіть тип дисплея: 1 = LCD1602 (16x2), 2 = LCD2004 (20x4)
+#define LCD_TYPE 2
+
+// Виберіть режим: 0 = 4-bit, 1 = I2C
+#define LCD_MODE 0
+
+// Encoder (інкрементальний)
 #define ENC_A   2      // INT0
 #define ENC_B   3      // INT1
 #define ENC_BTN 4
+
+// Абсолютний енкодер P3022-CW360 (аналоговий)
+#define ABS_ENC_PIN A0  // Аналоговий пін для абсолютного енкодера
 
 // DM556 Stepper Driver
 #define STEP_PIN 6
