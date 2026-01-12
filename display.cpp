@@ -447,13 +447,14 @@ void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
   
   if (_rows >= 4) {
     // LCD2004
+    // Перший рядок - завжди виводимо для надійності
     _lcd->setCursor(0, 0);
     _lcd->print("Target:");
-    printAt(11, 0, targetAngle);
+    printAt(9, 0, targetAngle);
     _lcd->write((uint8_t)0);  // Кастомний символ градуса
     if (_cols >= 20) _lcd->print("       ");
     
-    _lcd->setCursor(0, 2);
+    _lcd->setCursor(0, 1);
     _lcd->print("Mode: ");
     _lcd->print(modeName);
     if (_cols >= 20) {
@@ -463,7 +464,7 @@ void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
     }
     
     _lcd->setCursor(0, 3);
-    _lcd->print("Btn:Ok");
+    _lcd->print("Ok");
     if (_cols >= 20) _lcd->print("                  ");
   } else {
     // LCD1602
