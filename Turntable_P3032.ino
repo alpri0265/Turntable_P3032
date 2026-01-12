@@ -6,7 +6,6 @@
 #include "memory.h"
 #include "stepper.h"
 #include "menu.h"
-#include "direction_switch.h"
 #include "start_stop.h"
 
 /* ================== ОБʼЄКТИ ================== */
@@ -14,6 +13,7 @@ Encoder encoder(ENC_A, ENC_B);
 AbsoluteEncoder absoluteEncoder(ABS_ENC_PIN, 5.0, 360.0);
 Button button(ENC_BTN, BUTTON_DEBOUNCE_MS);
 Button digitModeButton(DIGIT_MODE_BUTTON_PIN, BUTTON_DEBOUNCE_MS);
+Button encoderZeroButton(DIRECTION_SWITCH_PIN, BUTTON_DEBOUNCE_MS);  // Кнопка встановлення нуля енкодера
 
 #if LCD_MODE == 0
   // 4-bit режим
@@ -26,7 +26,6 @@ Button digitModeButton(DIGIT_MODE_BUTTON_PIN, BUTTON_DEBOUNCE_MS);
 Memory memory(MIN_POS, MAX_POS);
 Stepper stepper(STEP_PIN, DIR_PIN);
 Menu menu;
-DirectionSwitch directionSwitch(DIRECTION_SWITCH_PIN);
 StartStop startStop(START_STOP_BUTTON_PIN, START_STOP_LED_PIN, BUTTON_DEBOUNCE_MS);
 
 /* ================== ЗМІННІ ================== */
@@ -38,14 +37,21 @@ void setup() {
   absoluteEncoder.begin();
   button.begin();
   digitModeButton.begin();
+  encoderZeroButton.begin();  // Кнопка встановлення нуля енкодера
   display.begin();
   stepper.begin();
-  directionSwitch.begin();
   startStop.begin();
   
   // Завантажуємо позицію з пам'яті
   int32_t savedPosition = 0;
   memory.load(savedPosition);
+  // Нормалізуємо позицію до діапазону 0-360 градусів перед встановленням
+  while (savedPosition < 0) {
+    savedPosition += STEPS_360;
+  }
+  while (savedPosition >= STEPS_360) {
+    savedPosition -= STEPS_360;
+  }
   stepper.setPosition(savedPosition);
   
   // Встановлюємо початковий цільовий кут з абсолютного енкодера
@@ -246,6 +252,12 @@ void loop() {
   
   startStop.updateLED();
   
+  // Обробка кнопки встановлення нуля абсолютного енкодера (працює на всіх екранах)
+  if (encoderZeroButton.isPressed()) {
+    absoluteEncoder.setZero();
+    display.showMessage("Encoder", "zero set");
+  }
+  
   // Використовуємо напрямок з меню Settings (замість фізичного перемикача)
   RotationDirection currentDirection = menu.getDirection();
   stepper.setDirectionInvert(currentDirection == DIR_CCW);
@@ -253,28 +265,64 @@ void loop() {
   // Отримуємо цільову позицію з меню
   int32_t targetPosition = menu.getTargetPosition();
   
+  // Оновлюємо кроковий двигун (неблокуюче) - завжди викликаємо для виконання кроків
+  stepper.update();
+  
   // Виконуємо рух до цільової позиції (тільки якщо старт активний)
   if (startStop.getState()) {
-    int32_t stepsNeeded = targetPosition - stepper.getPosition() - stepper.getRemaining();
-    if (stepsNeeded != 0) {
-      stepper.move(stepsNeeded);
+    // Обчислюємо ефективну поточну позицію (включаючи кроки в процесі виконання)
+    int32_t currentEffectivePosition = stepper.getPosition() + stepper.getRemaining();
+    
+    // Нормалізуємо поточну позицію до діапазону 0-360 градусів
+    while (currentEffectivePosition < 0) {
+      currentEffectivePosition += STEPS_360;
+    }
+    while (currentEffectivePosition >= STEPS_360) {
+      currentEffectivePosition -= STEPS_360;
     }
     
-    // Оновлюємо кроковий двигун (неблокуюче)
-    stepper.update();
+    // Нормалізуємо цільову позицію
+    int32_t normalizedTarget = targetPosition;
+    while (normalizedTarget < 0) {
+      normalizedTarget += STEPS_360;
+    }
+    while (normalizedTarget >= STEPS_360) {
+      normalizedTarget -= STEPS_360;
+    }
     
-    // Перевіряємо, чи досягнуто цільову позицію (тільки після того, як двигун рухався)
-    // Вимикаємо тільки якщо немає залишкових кроків (двигун завершив рух)
+    // Обчислюємо різницю з урахуванням кругового діапазону (найкоротший шлях)
+    int32_t stepsNeeded = normalizedTarget - currentEffectivePosition;
+    
+    // Якщо різниця більше половини кола, рухаємося в іншому напрямку (коротший шлях)
+    if (stepsNeeded > STEPS_360 / 2) {
+      stepsNeeded -= STEPS_360;
+    } else if (stepsNeeded < -STEPS_360 / 2) {
+      stepsNeeded += STEPS_360;
+    }
+    
+    // Статична змінна для відстеження попередньої цільової позиції
+    static int32_t lastTargetPosition = 0;
+    static bool targetChanged = false;
+    
+    // Відстежуємо зміну цільової позиції
+    if (targetPosition != lastTargetPosition) {
+      targetChanged = true;
+      lastTargetPosition = targetPosition;
+    }
+    
+    // Викликаємо move() тільки коли:
+    // 1. Двигун завершив попередній рух (getRemaining() == 0)
+    // 2. Є потреба в русі (stepsNeeded != 0)
+    // 3. Цільова позиція змінилася або це перший запуск
     if (stepper.getRemaining() == 0) {
-      static bool positionReached = false;
-      positionReached = menu.isPositionReached(
-        stepper.getPosition(), 
-        stepper.getRemaining()
-      );
-      
-      // Якщо позиція досягнута і немає залишкових кроків - автоматично вимикаємо двигун
-      if (positionReached) {
+      if (stepsNeeded != 0) {
+        // Двигун стоїть і потрібно рухатися - встановлюємо новий рух
+        stepper.move(stepsNeeded);
+        targetChanged = false;
+      } else if (abs(currentEffectivePosition - targetPosition) < 2) {
+        // Позиція досягнута - вимикаємо двигун
         startStop.setState(false);
+        targetChanged = false;
       }
     }
   } else {

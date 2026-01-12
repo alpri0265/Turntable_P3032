@@ -10,6 +10,7 @@ public:
   float readAngle();  // Читає кут в градусах (0-360)
   uint16_t readAngleInt();  // Читає кут як ціле число (0-360)
   bool hasChanged();  // Перевіряє, чи змінився кут
+  void setZero();  // Встановлює поточне положення як нуль (0°)
   
 private:
   uint8_t _analogPin;
@@ -17,7 +18,10 @@ private:
   float _maxAngle;
   uint16_t _lastAngle;
   unsigned long _lastReadTime;
+  float _zeroOffset;  // Зсув для встановлення нуля
   static const unsigned long READ_INTERVAL_MS = 10;  // Інтервал читання
+  
+  float readRawAngle();  // Читає сире значення кута без урахування offset
 };
 
 #endif

@@ -84,7 +84,15 @@ void Display::clear() {
 }
 
 void Display::drawFull(uint32_t position, uint32_t steps360) {
-  uint16_t deg = (uint32_t)position * 360 / steps360;
+  // Нормалізуємо позицію до діапазону 0-360 градусів
+  int32_t normalizedPosition = position;
+  while (normalizedPosition < 0) {
+    normalizedPosition += steps360;
+  }
+  while (normalizedPosition >= steps360) {
+    normalizedPosition -= steps360;
+  }
+  uint16_t deg = (uint32_t)normalizedPosition * 360 / steps360;
 
   _lcd->setCursor(0, 0);
   _lcd->print("Manual mode");
@@ -98,7 +106,15 @@ void Display::drawFull(uint32_t position, uint32_t steps360) {
 }
 
 void Display::drawAngleOnly(uint32_t position, uint32_t steps360) {
-  uint16_t deg = (uint32_t)position * 360 / steps360;
+  // Нормалізуємо позицію до діапазону 0-360 градусів
+  int32_t normalizedPosition = position;
+  while (normalizedPosition < 0) {
+    normalizedPosition += steps360;
+  }
+  while (normalizedPosition >= steps360) {
+    normalizedPosition -= steps360;
+  }
+  uint16_t deg = (uint32_t)normalizedPosition * 360 / steps360;
 
   printAt(7, 1, deg);
   _lcd->print((char)223); // °
@@ -129,7 +145,15 @@ void Display::updateWithTarget(uint32_t position, uint32_t steps360, uint16_t ta
 }
 
 void Display::drawWithTarget(uint32_t position, uint32_t steps360, uint16_t targetAngle) {
-  uint16_t currentDeg = (uint32_t)position * 360 / steps360;
+  // Нормалізуємо позицію до діапазону 0-360 градусів
+  int32_t normalizedPosition = position;
+  while (normalizedPosition < 0) {
+    normalizedPosition += steps360;
+  }
+  while (normalizedPosition >= steps360) {
+    normalizedPosition -= steps360;
+  }
+  uint16_t currentDeg = (uint32_t)normalizedPosition * 360 / steps360;
 
   if (_rows >= 4) {
     // Для LCD2004 (20x4) - використовуємо більше місця

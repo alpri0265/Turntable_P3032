@@ -13,6 +13,13 @@ void Stepper::begin() {
 }
 
 void Stepper::setPosition(int32_t position) {
+  // Нормалізуємо позицію до діапазону 0-360 градусів (0-STEPS_360)
+  while (position < MIN_POS) {
+    position += STEPS_360;
+  }
+  while (position >= STEPS_360) {
+    position -= STEPS_360;
+  }
   _position = position;
   _remaining = 0;
 }
@@ -79,5 +86,12 @@ void Stepper::doStep() {
   } else {
     _remaining++;
     _position--;
+  }
+  
+  // Нормалізуємо позицію до діапазону 0-360 градусів (0-STEPS_360)
+  if (_position < MIN_POS) {
+    _position += STEPS_360;  // Додаємо один повний оберт
+  } else if (_position >= STEPS_360) {
+    _position -= STEPS_360;  // Віднімаємо один повний оберт
   }
 }
