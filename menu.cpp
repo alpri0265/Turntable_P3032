@@ -103,6 +103,9 @@ void Menu::handleMainMenu(int16_t encoderDelta, bool buttonPressed) {
       case ITEM_STATUS:
         _currentMenu = MENU_STATUS;
         break;
+      case ITEM_SET_ANGLE:
+        _currentMenu = MENU_SET_ANGLE;
+        break;
       case ITEM_SETTINGS:
         _currentMenu = MENU_SETTINGS;
         break;
@@ -114,9 +117,10 @@ void Menu::handleMainMenu(int16_t encoderDelta, bool buttonPressed) {
 }
 
 void Menu::handleStatusMenu(bool buttonPressed) {
-  // При натисканні кнопки входимо в режим редагування кута
+  // При натисканні кнопки повертаємось до головного меню
   if (buttonPressed) {
-    _currentMenu = MENU_SET_ANGLE;
+    _currentMenu = MENU_MAIN;
+    _currentItem = ITEM_STATUS;  // Встановлюємо вибраний пункт на Status
   }
 }
 
@@ -147,11 +151,12 @@ void Menu::handleSetAngleMenu(int16_t encoderDelta, bool buttonPressed) {
     _manualAngleSet = true;
   }
   
-  // При натисканні кнопки зберігаємо та повертаємось до статусу
+  // При натисканні кнопки зберігаємо та повертаємось до головного меню
   if (buttonPressed) {
     // Встановлюємо прапорець, що кут встановлений вручну
     _manualAngleSet = true;
-    _currentMenu = MENU_STATUS;
+    _currentMenu = MENU_MAIN;
+    _currentItem = ITEM_STATUS;  // Встановлюємо вибраний пункт на Status
   }
 }
 

@@ -94,6 +94,21 @@ void loop() {
     
     // Оновлюємо кроковий двигун (неблокуюче)
     stepper.update();
+    
+    // Перевіряємо, чи досягнуто цільову позицію (тільки після того, як двигун рухався)
+    // Вимикаємо тільки якщо немає залишкових кроків (двигун завершив рух)
+    if (stepper.getRemaining() == 0) {
+      static bool positionReached = false;
+      positionReached = menu.isPositionReached(
+        stepper.getPosition(), 
+        stepper.getRemaining()
+      );
+      
+      // Якщо позиція досягнута і немає залишкових кроків - автоматично вимикаємо двигун
+      if (positionReached) {
+        startStop.setState(false);
+      }
+    }
   } else {
     // Якщо стоп - зупиняємо рух
     // (stepper.update() не викликається, тому рух зупиняється)
@@ -128,6 +143,7 @@ void loop() {
           
         case MENU_STATUS:
           {
+            // Перевіряємо досягнення позиції
             bool positionReached = menu.isPositionReached(
               stepper.getPosition(), 
               stepper.getRemaining()

@@ -200,19 +200,26 @@ void Display::showMainMenu(uint8_t selectedItem) {
     if (_cols >= 20) _lcd->print("           ");
     
     printMenuItem(1, 0, "Status", selectedItem == 0);
-    printMenuItem(2, 1, "Settings", selectedItem == 1);
-    printMenuItem(3, 2, "Save Position", selectedItem == 2);
+    printMenuItem(2, 1, "Set Angle", selectedItem == 1);
+    printMenuItem(3, 2, "Settings", selectedItem == 2);
+    if (_rows >= 4) {
+      _lcd->setCursor(0, 3);
+      printMenuItem(3, 3, "Save Position", selectedItem == 3);
+    }
   } else {
     // LCD1602 - показуємо по 2 пункти
     if (selectedItem == 0) {
       printMenuItem(0, 0, "Status", true);
-      printMenuItem(1, 1, "Settings", false);
+      printMenuItem(1, 1, "Set Angle", false);
     } else if (selectedItem == 1) {
       printMenuItem(0, 0, "Status", false);
-      printMenuItem(1, 1, "Settings", true);
+      printMenuItem(1, 1, "Set Angle", true);
+    } else if (selectedItem == 2) {
+      printMenuItem(0, 1, "Set Angle", false);
+      printMenuItem(1, 2, "Settings", true);
     } else {
-      printMenuItem(0, 1, "Settings", false);
-      printMenuItem(1, 2, "Save Position", true);
+      printMenuItem(0, 2, "Settings", false);
+      printMenuItem(1, 3, "Save Position", true);
     }
   }
 }

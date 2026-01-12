@@ -16,9 +16,10 @@ enum MenuType {
 // Пункти головного меню
 enum MainMenuItem {
   ITEM_STATUS = 0,
-  ITEM_SETTINGS = 1,
-  ITEM_SAVE = 2,
-  ITEM_COUNT = 3
+  ITEM_SET_ANGLE = 1,  // Встановлення кута
+  ITEM_SETTINGS = 2,
+  ITEM_SAVE = 3,
+  ITEM_COUNT = 4
 };
 
 class Menu {
