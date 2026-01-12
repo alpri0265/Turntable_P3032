@@ -2,6 +2,9 @@
 #include "config.h"
 #include <string.h>
 
+// Глобальна змінна для скидання сплеш-екрану
+static bool _splashNeedReset = false;
+
 #if LCD_MODE == 0
 // Конструктор для 4-bit режиму
 Display::Display(uint8_t rs, uint8_t enable, uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7)
@@ -190,6 +193,106 @@ void Display::printMenuItem(uint8_t row, uint8_t itemIndex, const char* text, bo
   }
 }
 
+void Display::resetSplashScreen() {
+  // Встановлюємо прапорець для скидання сплеш-екрану
+  _splashNeedReset = true;
+}
+
+void Display::showSplashScreen(uint16_t encoderAngle, uint16_t targetAngle, bool isRunning) {
+  static uint16_t lastEncoderAngle = 65535;
+  static uint16_t lastTargetAngle = 65535;
+  static bool lastIsRunning = false;
+  static bool firstDisplay = true;
+  
+  // Якщо потрібно скинути (викликано resetSplashScreen) - робимо це
+  if (_splashNeedReset) {
+    firstDisplay = true;
+    _splashNeedReset = false;
+    lastEncoderAngle = 65535;
+    lastTargetAngle = 65535;
+    lastIsRunning = !isRunning;
+  }
+
+  if (firstDisplay) {
+    _lcd->clear();
+    firstDisplay = false;
+    lastEncoderAngle = 65535; // Примусово оновити
+    lastTargetAngle = 65535;
+    lastIsRunning = !isRunning;
+  }
+
+  if (_rows >= 4) {
+    // LCD2004
+    // Заголовок
+    if (lastEncoderAngle == 65535) {
+      _lcd->setCursor(0, 0);
+      _lcd->print("Turntable Ready");
+      if (_cols >= 20) _lcd->print("      ");
+    }
+
+    // Кут з абсолютного енкодера (поточний стан)
+    if (lastEncoderAngle == 65535) {
+      _lcd->setCursor(0, 1);
+      _lcd->print("Encoder: ");
+    }
+    if (lastEncoderAngle != encoderAngle) {
+      printAt(9, 1, encoderAngle);
+      _lcd->print((char)223);
+      if (_cols >= 20) _lcd->print("      ");
+      lastEncoderAngle = encoderAngle;
+    }
+
+    // Цільовий кут (встановлений для руху)
+    if (lastTargetAngle == 65535) {
+      _lcd->setCursor(0, 2);
+      _lcd->print("Target: ");
+    }
+    if (lastTargetAngle != targetAngle) {
+      printAt(8, 2, targetAngle);
+      _lcd->print((char)223);
+      if (_cols >= 20) _lcd->print("      ");
+      lastTargetAngle = targetAngle;
+    }
+
+    // Стан та інструкції
+    if (lastIsRunning != isRunning) {
+      _lcd->setCursor(0, 3);
+      if (isRunning) {
+        _lcd->print("Status: RUNNING");
+      } else {
+        _lcd->print("Btn: Start/Menu");
+      }
+      if (_cols >= 20) _lcd->print("    ");
+      lastIsRunning = isRunning;
+    }
+  } else {
+    // LCD1602
+    // Кут з абсолютного енкодера
+    if (lastEncoderAngle == 65535 || lastEncoderAngle != encoderAngle) {
+      _lcd->setCursor(0, 0);
+      _lcd->print("Enc: ");
+      printAt(5, 0, encoderAngle);
+      _lcd->print((char)223);
+      lastEncoderAngle = encoderAngle;
+    }
+
+    // Цільовий кут та стан
+    if (lastTargetAngle == 65535 || lastTargetAngle != targetAngle || lastIsRunning != isRunning) {
+      _lcd->setCursor(0, 1);
+      _lcd->print("Tgt: ");
+      printAt(5, 1, targetAngle);
+      _lcd->print((char)223);
+      if (isRunning) {
+        _lcd->print(" RUN");
+      } else {
+        _lcd->print(" STOP");
+      }
+      lastTargetAngle = targetAngle;
+      lastIsRunning = isRunning;
+    }
+  }
+}
+
 void Display::showMainMenu(uint8_t selectedItem) {
   static uint8_t lastSelectedItem = 255;
   
@@ -205,20 +308,24 @@ void Display::showMainMenu(uint8_t selectedItem) {
     _lcd->print("Main Menu");
     if (_cols >= 20) _lcd->print("           ");
     
-    printMenuItem(1, 0, "Status", selectedItem == 0);
+    printMenuItem(1, 0, "Home", selectedItem == 0);
     printMenuItem(2, 1, "Set Angle", selectedItem == 1);
-    printMenuItem(3, 2, "Settings", selectedItem == 2);
-    if (_rows >= 4) {
-      _lcd->setCursor(0, 3);
-      printMenuItem(3, 3, "Save Position", selectedItem == 3);
+    
+    // Рядок 3: показуємо Settings або Save Position залежно від вибору
+    if (selectedItem == 3) {
+      // Якщо вибрано Save Position - показуємо його на рядку 3 замість Settings
+      printMenuItem(3, 3, "Save Position", true);
+    } else {
+      // Інакше завжди показуємо Settings на рядку 3
+      printMenuItem(3, 2, "Settings", selectedItem == 2);
     }
   } else {
     // LCD1602 - показуємо по 2 пункти
     if (selectedItem == 0) {
-      printMenuItem(0, 0, "Status", true);
+      printMenuItem(0, 0, "Home", true);
       printMenuItem(1, 1, "Set Angle", false);
     } else if (selectedItem == 1) {
-      printMenuItem(0, 0, "Status", false);
+      printMenuItem(0, 0, "Home", false);
       printMenuItem(1, 1, "Set Angle", true);
     } else if (selectedItem == 2) {
       printMenuItem(0, 1, "Set Angle", false);
@@ -226,110 +333,6 @@ void Display::showMainMenu(uint8_t selectedItem) {
     } else {
       printMenuItem(0, 2, "Settings", false);
       printMenuItem(1, 3, "Save Position", true);
-    }
-  }
-}
-
-void Display::showStatusMenu(uint32_t position, uint32_t steps360, uint16_t targetAngle, bool positionReached, bool directionCCW) {
-  static uint16_t lastCurrentDeg = 65535;
-  static uint16_t lastTargetAngle = 65535;
-  static bool lastPositionReached = false;
-  static bool lastDirectionCCW = false;
-  static bool firstDisplay = true;
-  
-  uint16_t currentDeg = (uint32_t)position * 360 / steps360;
-  
-  // Оновлюємо тільки якщо змінився стан або це перший виклик
-  if (firstDisplay) {
-    _lcd->clear();
-    firstDisplay = false;
-    lastCurrentDeg = 65535; // Примусово оновити всі значення
-    lastTargetAngle = 65535;
-    lastPositionReached = !positionReached; // Примусово оновити
-    lastDirectionCCW = !directionCCW; // Примусово оновити
-  }
-  
-  if (_rows >= 4) {
-    // LCD2004
-    if (lastCurrentDeg == 65535) {
-      _lcd->setCursor(0, 0);
-      _lcd->print("Status");
-      if (_cols >= 20) _lcd->print("              ");
-      
-      _lcd->setCursor(0, 1);
-      _lcd->print("Current: ");
-    }
-    
-    // Оновлюємо тільки якщо змінився поточний кут
-    if (lastCurrentDeg != currentDeg) {
-      printAt(9, 1, currentDeg);
-      _lcd->print((char)223);
-      if (_cols >= 20) _lcd->print("      ");
-      lastCurrentDeg = currentDeg;
-    }
-    
-    if (firstDisplay || lastTargetAngle == 65535) {
-      _lcd->setCursor(0, 2);
-      _lcd->print("Target:  ");
-    }
-    
-    // Оновлюємо тільки якщо змінився цільовий кут
-    if (lastTargetAngle != targetAngle) {
-      printAt(9, 2, targetAngle);
-      _lcd->print((char)223);
-      if (_cols >= 20) _lcd->print("      ");
-      lastTargetAngle = targetAngle;
-    }
-    
-    // Оновлюємо тільки якщо змінився стан позиції або напрямок
-    if (lastPositionReached != positionReached || lastDirectionCCW != directionCCW) {
-      _lcd->setCursor(0, 3);
-      if (positionReached) {
-        _lcd->print("Pos: OK ");
-      } else {
-        _lcd->print("Pos: Moving ");
-      }
-      // Показуємо напрямок
-      if (directionCCW) {
-        _lcd->print("CCW");
-      } else {
-        _lcd->print("CW ");
-      }
-      if (_cols >= 20) _lcd->print("   ");
-      lastPositionReached = positionReached;
-      lastDirectionCCW = directionCCW;
-    }
-  } else {
-    // LCD1602
-    // Оновлюємо тільки якщо змінився поточний кут або напрямок
-    if (lastCurrentDeg != currentDeg || lastDirectionCCW != directionCCW) {
-      _lcd->setCursor(0, 0);
-      _lcd->print("Cur: ");
-      printAt(5, 0, currentDeg);
-      _lcd->print((char)223);
-      // Показуємо напрямок
-      if (directionCCW) {
-        _lcd->print(" CCW");
-      } else {
-        _lcd->print(" CW ");
-      }
-      lastCurrentDeg = currentDeg;
-      lastDirectionCCW = directionCCW;
-    }
-    
-    // Оновлюємо тільки якщо змінився цільовий кут або стан позиції
-    if (lastTargetAngle != targetAngle || lastPositionReached != positionReached) {
-      _lcd->setCursor(0, 1);
-      _lcd->print("Tgt: ");
-      printAt(5, 1, targetAngle);
-      _lcd->print((char)223);
-      if (positionReached) {
-        _lcd->print(" OK");
-      } else {
-        _lcd->print(" ->");
-      }
-      lastTargetAngle = targetAngle;
-      lastPositionReached = positionReached;
     }
   }
 }
@@ -397,35 +400,58 @@ void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
   }
 }
 
-void Display::showSettingsMenu() {
-  _lcd->clear();
+void Display::showSettingsMenu(uint8_t direction) {
+  // Екран вже очищено в Turntable_P3032.ino при переході в меню
+  // Тут просто відображаємо вміст
+  
+  static uint8_t lastDirection = 255;
+  bool directionChanged = (lastDirection != direction);
+  lastDirection = direction;
   
   if (_rows >= 4) {
+    // LCD2004
     _lcd->setCursor(0, 0);
     _lcd->print("Settings");
     if (_cols >= 20) _lcd->print("            ");
     
     _lcd->setCursor(0, 1);
-    _lcd->print("(Not implemented)");
-    if (_cols >= 20) _lcd->print("    ");
+    _lcd->print("Direction:");
+    if (_cols >= 20) _lcd->print("          ");
     
-    _lcd->setCursor(0, 2);
-    _lcd->print("Press button to");
-    if (_cols >= 20) _lcd->print("     ");
+    // Оновлюємо напрямок тільки якщо змінився
+    if (directionChanged) {
+      _lcd->setCursor(0, 2);
+      if (direction == 0) {
+        _lcd->print("> CW  (Clockwise)");
+        if (_cols >= 20) _lcd->print("  ");
+      } else {
+        _lcd->print("> CCW (Counter-CW)");
+        if (_cols >= 20) _lcd->print("");
+      }
+    }
     
     _lcd->setCursor(0, 3);
-    _lcd->print("return");
-    if (_cols >= 20) _lcd->print("              ");
+    _lcd->print("Rotate to change");
+    if (_cols >= 20) _lcd->print("    ");
   } else {
-    _lcd->setCursor(0, 0);
-    _lcd->print("Settings");
+    // LCD1602
+    if (directionChanged) {
+      _lcd->setCursor(0, 0);
+      _lcd->print("Direction: ");
+      if (direction == 0) {
+        _lcd->print("CW ");
+      } else {
+        _lcd->print("CCW");
+      }
+    }
     _lcd->setCursor(0, 1);
-    _lcd->print("Press to return");
+    _lcd->print("Rotate to change");
   }
 }
 
 void Display::showSaveMenu() {
-  _lcd->clear();
+  // Екран вже очищено в Turntable_P3032.ino при переході в меню
+  // Тут просто відображаємо вміст
   
   if (_rows >= 4) {
     _lcd->setCursor(0, 0);

@@ -9,6 +9,7 @@ public:
   void begin();
   bool isPressed();  // Перевіряє натискання з debounce
   bool wasPressed();  // Повертає true один раз після натискання
+  bool isCurrentlyPressed() const;  // Перевіряє поточний стан кнопки (без debounce)
   
 private:
   uint8_t _pin;

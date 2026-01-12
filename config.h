@@ -74,7 +74,7 @@
 #define STEP_DELAY_US 600  // затримка між кроками в мікросекундах
 #define STEP_PULSE_US 4    // тривалість імпульсу STEP
 #define LCD_UPDATE_MS 100  // інтервал оновлення LCD
-#define BUTTON_DEBOUNCE_MS 500  // затримка для кнопки
+#define BUTTON_DEBOUNCE_MS 50  // затримка для кнопки (зменшено для кращої відповіді)
 #define SAVE_MESSAGE_MS 400     // час показу повідомлення про збереження
 
 #endif

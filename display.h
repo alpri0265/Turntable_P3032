@@ -28,10 +28,11 @@ public:
   void clear();
   
   // Відображення меню
+  void showSplashScreen(uint16_t encoderAngle, uint16_t targetAngle, bool isRunning);
+  void resetSplashScreen(); // Скидання стану сплеш-екрану при поверненні
   void showMainMenu(uint8_t selectedItem);
-  void showStatusMenu(uint32_t position, uint32_t steps360, uint16_t targetAngle, bool positionReached, bool directionCCW);
   void showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode);
-  void showSettingsMenu();
+  void showSettingsMenu(uint8_t direction);  // direction: 0 = CW, 1 = CCW
   void showSaveMenu();
   
 private:

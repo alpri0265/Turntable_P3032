@@ -3,11 +3,12 @@
 
 #include <Arduino.h>
 #include "config.h"
+#include "direction_switch.h"
 
 // Типи меню
 enum MenuType {
+  MENU_SPLASH,         // Початковий екран
   MENU_MAIN,           // Головне меню
-  MENU_STATUS,         // Статус системи
   MENU_SET_ANGLE,      // Встановлення кута (редагування)
   MENU_SETTINGS,       // Налаштування
   MENU_SAVE            // Збереження
@@ -15,7 +16,7 @@ enum MenuType {
 
 // Пункти головного меню
 enum MainMenuItem {
-  ITEM_STATUS = 0,
+  ITEM_HOME = 0,       // Повернення на стартовий екран
   ITEM_SET_ANGLE = 1,  // Встановлення кута
   ITEM_SETTINGS = 2,
   ITEM_SAVE = 3,
@@ -31,6 +32,13 @@ public:
   
   // Оновлення режиму редагування розрядів (для меню Set Angle)
   void updateDigitMode(bool digitButtonPressed);
+  
+  // Обробка сплеш-екрану
+  void handleSplashMenu(bool buttonPressed, bool startButtonPressed);
+  
+  // Перевірка, чи потрібно обнулити позицію
+  bool shouldResetPosition() const { return _shouldResetPosition; }
+  void clearResetPositionFlag() { _shouldResetPosition = false; }
   
   // Оновлення цільового кута з абсолютного енкодера
   // Оновлює кут тільки якщо він не був встановлений вручну
@@ -67,6 +75,13 @@ public:
   // Перевірка, чи позиція відповідає цільовій
   bool isPositionReached(int32_t currentPos, int32_t remaining) const;
   
+  // Перевірка, чи потрібно скинути сплеш-екран (при поверненні з меню)
+  bool shouldResetSplash() const { return _shouldResetSplash; }
+  void clearResetSplashFlag() { _shouldResetSplash = false; }
+
+  // Отримання вибраного напрямку руху
+  RotationDirection getDirection() const { return _selectedDirection; }
+  
 private:
   MenuType _currentMenu;
   uint8_t _currentItem;
@@ -74,6 +89,8 @@ private:
   int32_t _targetPosition;
   bool _shouldSave;
   bool _manualAngleSet;  // Прапорець, що кут встановлений вручну
+  bool _shouldResetSplash;  // Прапорець для скидання сплеш-екрану
+  bool _shouldResetPosition;  // Прапорець для обнулення позиції енкодера
   uint16_t _lastAbsoluteAngle;  // Останнє значення абсолютного енкодера
   unsigned long _lastMenuChangeTime;  // Час останньої зміни пункту меню
   static const unsigned long MENU_CHANGE_DELAY_MS = 150;  // Затримка між змінами пунктів меню
@@ -85,10 +102,10 @@ private:
     DIGIT_HUNDREDS = 2  // Сотні (±100)
   };
   DigitMode _digitMode;  // Поточний режим редагування розряду
+  RotationDirection _selectedDirection;  // Вибраний напрямок руху (CW/CCW)
   
   int32_t angleToSteps(uint16_t angle);
   void handleMainMenu(int16_t encoderDelta, bool buttonPressed);
-  void handleStatusMenu(bool buttonPressed);
   void handleSetAngleMenu(int16_t encoderDelta, bool buttonPressed);
   void handleSettingsMenu(int16_t encoderDelta, bool buttonPressed);
   void handleSaveMenu(bool buttonPressed);

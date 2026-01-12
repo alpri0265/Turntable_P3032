@@ -31,3 +31,7 @@ bool Button::wasPressed() {
   }
   return false;
 }
+
+bool Button::isCurrentlyPressed() const {
+  return !digitalRead(_pin);  // інвертуємо, бо INPUT_PULLUP
+}

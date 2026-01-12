@@ -1,9 +1,9 @@
 #include "menu.h"
 
-Menu::Menu() 
-  : _currentMenu(MENU_MAIN), _currentItem(0), _targetAngle(0), 
+Menu::Menu()
+  : _currentMenu(MENU_SPLASH), _currentItem(0), _targetAngle(0),
     _targetPosition(0), _shouldSave(false), _manualAngleSet(false),
-    _lastAbsoluteAngle(999), _lastMenuChangeTime(0), _digitMode(DIGIT_UNITS) {
+    _shouldResetSplash(false), _shouldResetPosition(false), _lastAbsoluteAngle(999), _lastMenuChangeTime(0), _digitMode(DIGIT_UNITS), _selectedDirection(DIR_CW) {
 }
 
 int32_t Menu::angleToSteps(uint16_t angle) {
@@ -17,28 +17,15 @@ void Menu::updateTargetAngle(uint16_t absoluteAngle) {
     return;
   }
   
-  // Якщо кут був встановлений вручну, перевіряємо чи абсолютний енкодер змінився значно
+  // Якщо кут був встановлений вручну - НЕ оновлюємо з абсолютного енкодера
+  // Кут залишається таким, який був встановлений вручну, поки користувач не скине прапорець
   if (_manualAngleSet) {
-    // Якщо це перше читання - зберігаємо значення
+    // Просто оновлюємо останнє значення абсолютного енкодера для відстеження
     if (_lastAbsoluteAngle == 999) {
       _lastAbsoluteAngle = absoluteAngle;
-      return;
     }
-    
-    // Обчислюємо різницю (враховуючи перехід через 0/360)
-    int16_t diff1 = abs((int16_t)absoluteAngle - (int16_t)_lastAbsoluteAngle);
-    int16_t diff2 = 360 - diff1;
-    int16_t diff = (diff1 < diff2) ? diff1 : diff2;
-    
-    // Якщо абсолютний енкодер змінився більше ніж на 5 градусів - скидаємо прапорець
-    if (diff > 5) {
-      _manualAngleSet = false;
-      _lastAbsoluteAngle = absoluteAngle;
-      // Продовжуємо оновлення кута
-    } else {
-      // Невелика зміна - не оновлюємо кут
-      return;
-    }
+    // Не оновлюємо цільовий кут - залишаємо встановлений вручну
+    return;
   }
   
   // Оновлюємо кут з абсолютного енкодера
@@ -64,14 +51,30 @@ void Menu::resetManualAngleFlag() {
   _manualAngleSet = false;
 }
 
+void Menu::handleSplashMenu(bool buttonPressed, bool startButtonPressed) {
+  // Кнопка енкодера - перехід в головне меню
+  if (buttonPressed) {
+    _currentMenu = MENU_MAIN;
+    _currentItem = 0;
+    return;
+  }
+  
+  // Кнопка старт-стоп - запуск двигуна (якщо не запущений)
+  if (startButtonPressed) {
+    // Логіка старту обробляється в Turntable_P3032.ino через startStop.setState()
+    // Тут просто залишаємося на сплеш-екрані
+  }
+}
+
 void Menu::updateNavigation(int16_t encoderDelta, bool buttonPressed) {
   // Обробка навігації залежно від поточного меню
   switch (_currentMenu) {
+    case MENU_SPLASH:
+      // Сплаш-екран обробляється окремо через handleSplashMenu
+      break;
+      
     case MENU_MAIN:
       handleMainMenu(encoderDelta, buttonPressed);
-      break;
-    case MENU_STATUS:
-      handleStatusMenu(buttonPressed);
       break;
     case MENU_SET_ANGLE:
       handleSetAngleMenu(encoderDelta, buttonPressed);
@@ -105,9 +108,20 @@ void Menu::handleMainMenu(int16_t encoderDelta, bool buttonPressed) {
   
   // Обробка вибору пункту
   if (buttonPressed) {
+    // Скидаємо затримку при натисканні кнопки для негайної реакції
+    _lastMenuChangeTime = now;
+    
     switch (_currentItem) {
-      case ITEM_STATUS:
-        _currentMenu = MENU_STATUS;
+      case ITEM_HOME:
+        {
+          // Змінюємо меню на сплеш-екран
+          _currentMenu = MENU_SPLASH;
+          _currentItem = 0;
+          // Завжди встановлюємо прапорець для скидання сплеш-екрану
+          _shouldResetSplash = true;
+          // Повертаємося одразу, щоб перехід спрацював
+          return;
+        }
         break;
       case ITEM_SET_ANGLE:
         _currentMenu = MENU_SET_ANGLE;
@@ -119,14 +133,6 @@ void Menu::handleMainMenu(int16_t encoderDelta, bool buttonPressed) {
         _currentMenu = MENU_SAVE;
         break;
     }
-  }
-}
-
-void Menu::handleStatusMenu(bool buttonPressed) {
-  // При натисканні кнопки повертаємось до головного меню
-  if (buttonPressed) {
-    _currentMenu = MENU_MAIN;
-    _currentItem = ITEM_STATUS;  // Встановлюємо вибраний пункт на Status
   }
 }
 
@@ -146,11 +152,12 @@ void Menu::handleSetAngleMenu(int16_t encoderDelta, bool buttonPressed) {
   // Редагування кута через інкрементальний енкодер з затримкою
   unsigned long now = millis();
   
-  // При натисканні кнопки енкодера - вихід з меню
+  // При натисканні кнопки енкодера - повернення на стартовий екран
   if (buttonPressed) {
     _manualAngleSet = true;
-    _currentMenu = MENU_MAIN;
-    _currentItem = ITEM_SET_ANGLE;
+    _currentMenu = MENU_SPLASH;
+    _currentItem = 0;
+    _shouldResetSplash = true;  // Встановлюємо прапорець для скидання сплеш-екрану
     return;
   }
   
@@ -216,19 +223,30 @@ void Menu::setTargetAngle(uint16_t angle) {
 }
 
 void Menu::handleSettingsMenu(int16_t encoderDelta, bool buttonPressed) {
-  // Налаштування (можна розширити)
+  // Обробка перемикання напрямку (CW/CCW)
+  unsigned long now = millis();
+  
+  if (encoderDelta != 0 && (now - _lastMenuChangeTime >= MENU_CHANGE_DELAY_MS)) {
+    // Перемикаємо напрямок
+    _selectedDirection = (_selectedDirection == DIR_CW) ? DIR_CCW : DIR_CW;
+    _lastMenuChangeTime = now;
+  }
+  
+  // При натисканні кнопки повертаємось на стартовий екран
   if (buttonPressed) {
-    _currentMenu = MENU_MAIN;
-    _currentItem = ITEM_SETTINGS;
+    _currentMenu = MENU_SPLASH;
+    _currentItem = 0;
+    _shouldResetSplash = true;  // Встановлюємо прапорець для скидання сплеш-екрану
   }
 }
 
 void Menu::handleSaveMenu(bool buttonPressed) {
-  // Підтвердження збереження
+  // При натисканні кнопки зберігаємо позицію та повертаємось на стартовий екран
   if (buttonPressed) {
     _shouldSave = true;
-    _currentMenu = MENU_MAIN;
-    _currentItem = ITEM_SAVE;
+    _currentMenu = MENU_SPLASH;
+    _currentItem = 0;
+    _shouldResetSplash = true;  // Встановлюємо прапорець для скидання сплеш-екрану
   }
 }
 

@@ -52,8 +52,9 @@ void setup() {
   uint16_t initialAngle = absoluteEncoder.readAngleInt();
   menu.updateTargetAngle(initialAngle);
   
-  // Показуємо початковий екран (головне меню)
-  display.showMainMenu(menu.getCurrentItem());
+  // Показуємо початковий екран (сплеш-екран)
+  uint16_t initialEncoderAngle = absoluteEncoder.readAngleInt();
+  display.showSplashScreen(initialEncoderAngle, menu.getTargetAngle(), false);
 }
 
 /* ================== LOOP ================== */
@@ -69,32 +70,122 @@ void loop() {
   }
   
   // Читаємо абсолютний енкодер P3022-CW360 (встановлює цільовий кут)
-  // Тільки якщо не активний режим редагування через меню
+  // Оновлюємо на сплеш-екрані та в інших меню (крім режиму редагування)
   // updateTargetAngle сам перевіряє прапорець _manualAngleSet
-  if (!menu.isEditingAngle()) {
+  if (menu.getCurrentMenu() == MENU_SPLASH || !menu.isEditingAngle()) {
     uint16_t absoluteAngle = absoluteEncoder.readAngleInt();
     menu.updateTargetAngle(absoluteAngle);
   }
   
   // Перевіряємо кнопки
-  bool buttonPressed = button.isPressed();
+  // Для інших меню використовуємо isPressed() з debounce
+  // Але перевіряємо кнопку безпосередньо перед використанням
   bool digitButtonPressed = digitModeButton.isPressed();
   
-  // Оновлюємо режим редагування розрядів (тільки в меню Set Angle)
-  if (menu.isEditingAngle()) {
-    menu.updateDigitMode(digitButtonPressed);
+  // Відстежуємо натискання кнопки енкодера для обнулення позиції (тільки на сплеш-екрані)
+  static unsigned long buttonPressStartTime = 0;
+  static bool buttonWasPressed = false;
+  static bool longPressDetected = false;
+  static bool wasOnSplash = false;
+  
+  bool isOnSplash = (menu.getCurrentMenu() == MENU_SPLASH);
+  
+  // Обробка сплеш-екрану
+  if (isOnSplash) {
+    // Скидаємо стан при виході з сплеш-екрану і поверненні
+    if (!wasOnSplash) {
+      buttonWasPressed = false;
+      longPressDetected = false;
+      wasOnSplash = true;
+    }
+    
+    bool buttonCurrentlyPressed = button.isCurrentlyPressed();
+    
+    if (buttonCurrentlyPressed && !buttonWasPressed) {
+      // Кнопка тільки що натиснута
+      buttonPressStartTime = millis();
+      buttonWasPressed = true;
+      longPressDetected = false;
+    } else if (buttonCurrentlyPressed && buttonWasPressed) {
+      // Кнопка все ще натиснута - перевіряємо час
+      unsigned long pressDuration = millis() - buttonPressStartTime;
+      if (pressDuration >= 2000 && !longPressDetected) {
+        // Довге натискання виявлено - обнуляємо позицію
+        longPressDetected = true;
+        stepper.setPosition(0);
+        memory.save(0);
+        display.showMessage("Position", "reset to 0");
+      }
+    } else if (!buttonCurrentlyPressed && buttonWasPressed) {
+      // Кнопка відпущена
+      unsigned long pressDuration = millis() - buttonPressStartTime;
+      buttonWasPressed = false;
+      
+      // Якщо було довге натискання - не переходимо в меню
+      if (longPressDetected) {
+        longPressDetected = false;
+      } else if (pressDuration < 2000 && pressDuration > 50) {
+        // Коротке натискання (більше 50мс для debounce, менше 2 секунд) - переходимо в меню
+        menu.handleSplashMenu(true, false); // Перехід в меню
+      }
+    }
+    
+    // Обробка кнопки старт-стоп на сплеш-екрані
+    bool startStopPressed = startStop.isPressed();
+    if (startStopPressed) {
+      startStop.setState(true);
+    }
+    
+    // Обробка сплеш-екрану (тільки для старт-стоп, кнопка енкодера обробляється вище)
+    menu.handleSplashMenu(false, startStopPressed);
+  } else {
+    // Не на сплеш-екрані - скидаємо прапорець
+    wasOnSplash = false;
+    // Оновлюємо режим редагування розрядів (тільки в меню Set Angle)
+    if (menu.isEditingAngle()) {
+      menu.updateDigitMode(digitButtonPressed);
+    }
+    
+    // Зберігаємо попереднє меню для перевірки зміни
+    static MenuType lastMenu = MENU_SPLASH;
+    MenuType currentMenuBefore = menu.getCurrentMenu();
+    
+    // Перевіряємо кнопку енкодера безпосередньо перед використанням
+    // Це важливо, бо isPressed() повертає true тільки один раз при натисканні
+    bool buttonPressed = button.isPressed();
+    
+    // Оновлюємо навігацію по меню (інкрементальний енкодер + кнопка)
+    menu.updateNavigation(encoderDelta, buttonPressed);
+    
+    // Перевіряємо, чи змінилося меню на сплеш-екран
+    MenuType currentMenuAfter = menu.getCurrentMenu();
+    
+    // Перевірка 1: Якщо меню змінилося на сплеш-екран
+    if (currentMenuBefore != MENU_SPLASH && currentMenuAfter == MENU_SPLASH) {
+      // Повернулися на сплеш-екран - скидаємо екран одразу
+      display.resetSplashScreen();
+      menu.clearResetSplashFlag(); // Скидаємо прапорець
+      // Примусово оновлюємо дисплей для відображення сплеш-екрану
+      lastDisplayUpdate = 0; // Скидаємо таймер для негайного оновлення
+    }
+    
+    // Перевірка 2: Якщо прапорець встановлений і ми на сплеш-екрані (додаткова перевірка)
+    if (menu.shouldResetSplash() && currentMenuAfter == MENU_SPLASH) {
+      display.resetSplashScreen();
+      menu.clearResetSplashFlag();
+      lastDisplayUpdate = 0; // Примусово оновлюємо дисплей
+    }
+    
+    lastMenu = currentMenuAfter;
+    
+    // Обробка кнопки старт-стоп (тільки якщо не на сплеш-екрані)
+    startStop.toggle();
   }
   
-  // Оновлюємо навігацію по меню (інкрементальний енкодер + кнопка)
-  menu.updateNavigation(encoderDelta, buttonPressed);
-  
-  // Обробка кнопки старт-стоп
-  startStop.toggle();
   startStop.updateLED();
   
-  // Читаємо перемикач напрямку та встановлюємо інверсію
-  static RotationDirection currentDirection = DIR_CW;
-  currentDirection = directionSwitch.read();
+  // Використовуємо напрямок з меню Settings (замість фізичного перемикача)
+  RotationDirection currentDirection = menu.getDirection();
   stepper.setDirectionInvert(currentDirection == DIR_CCW);
   
   // Отримуємо цільову позицію з меню
@@ -151,38 +242,63 @@ void loop() {
     
     // Оновлюємо меню
     if (now - lastDisplayUpdate > LCD_UPDATE_MS) {
-      switch (menu.getCurrentMenu()) {
-        case MENU_MAIN:
-          display.showMainMenu(menu.getCurrentItem());
-          break;
-          
-        case MENU_STATUS:
+      // Відстежуємо зміну меню для скидання стану відображення
+      static MenuType lastMenuType = MENU_SPLASH;
+      MenuType currentMenuType = menu.getCurrentMenu();
+      bool menuChanged = (lastMenuType != currentMenuType);
+      
+      // Додаткова перевірка: якщо меню змінилося на сплеш-екран
+      if (lastMenuType != MENU_SPLASH && currentMenuType == MENU_SPLASH) {
+        // Примусово скидаємо сплеш-екран при переході
+        display.resetSplashScreen();
+        menu.clearResetSplashFlag();
+        lastDisplayUpdate = 0; // Примусово оновлюємо дисплей
+      }
+      
+      lastMenuType = currentMenuType;
+      
+      switch (currentMenuType) {
+        case MENU_SPLASH:
           {
-            // Перевіряємо досягнення позиції
-            bool positionReached = menu.isPositionReached(
-              stepper.getPosition(), 
-              stepper.getRemaining()
-            );
-            bool directionCCW = (currentDirection == DIR_CCW);
-            display.showStatusMenu(
-              stepper.getPosition(), 
-              STEPS_360, 
+            // Перевіряємо, чи потрібно скинути сплеш-екран (при поверненні з меню)
+            // Це додаткова перевірка на випадок, якщо перехід не був виявлений раніше
+            if (menu.shouldResetSplash()) {
+              display.resetSplashScreen();
+              menu.clearResetSplashFlag();
+              lastDisplayUpdate = 0; // Примусово оновлюємо дисплей
+            }
+            
+            // Показуємо кут з абсолютного енкодера та цільовий кут
+            uint16_t encoderAngle = absoluteEncoder.readAngleInt();
+            display.showSplashScreen(
+              encoderAngle,
               menu.getTargetAngle(),
-              positionReached,
-              directionCCW
+              startStop.getState()
             );
           }
           break;
           
-                case MENU_SET_ANGLE:
-                  display.showSetAngleMenu(menu.getTargetAngle(), menu.getDigitMode());
-                  break;
+        case MENU_MAIN:
+          display.showMainMenu(menu.getCurrentItem());
+          break;
+          
+        case MENU_SET_ANGLE:
+          display.showSetAngleMenu(menu.getTargetAngle(), menu.getDigitMode());
+          break;
           
         case MENU_SETTINGS:
-          display.showSettingsMenu();
+          // Очищаємо екран при переході в Settings меню
+          if (menuChanged) {
+            display.clear();
+          }
+          display.showSettingsMenu(menu.getDirection() == DIR_CCW ? 1 : 0);
           break;
           
         case MENU_SAVE:
+          // Очищаємо екран при переході в Save меню
+          if (menuChanged) {
+            display.clear();
+          }
           display.showSaveMenu();
           break;
       }
