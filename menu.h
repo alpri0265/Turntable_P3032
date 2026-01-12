@@ -29,6 +29,9 @@ public:
   // Оновлення меню з інкрементальним енкодером (навігація)
   void updateNavigation(int16_t encoderDelta, bool buttonPressed);
   
+  // Оновлення режиму редагування розрядів (для меню Set Angle)
+  void updateDigitMode(bool digitButtonPressed);
+  
   // Оновлення цільового кута з абсолютного енкодера
   // Оновлює кут тільки якщо він не був встановлений вручну
   void updateTargetAngle(uint16_t absoluteAngle);
@@ -51,6 +54,9 @@ public:
   // Перевірка, чи активний режим редагування кута
   bool isEditingAngle() const { return _currentMenu == MENU_SET_ANGLE; }
   
+  // Отримання поточного режиму редагування розряду
+  uint8_t getDigitMode() const { return _digitMode; }
+  
   // Отримання цільової позиції в кроках
   int32_t getTargetPosition() const { return _targetPosition; }
   
@@ -71,6 +77,14 @@ private:
   uint16_t _lastAbsoluteAngle;  // Останнє значення абсолютного енкодера
   unsigned long _lastMenuChangeTime;  // Час останньої зміни пункту меню
   static const unsigned long MENU_CHANGE_DELAY_MS = 150;  // Затримка між змінами пунктів меню
+  
+  // Режими редагування розрядів кута
+  enum DigitMode {
+    DIGIT_UNITS = 0,    // Одиниці (±1)
+    DIGIT_TENS = 1,     // Десятки (±10)
+    DIGIT_HUNDREDS = 2  // Сотні (±100)
+  };
+  DigitMode _digitMode;  // Поточний режим редагування розряду
   
   int32_t angleToSteps(uint16_t angle);
   void handleMainMenu(int16_t encoderDelta, bool buttonPressed);

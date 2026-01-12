@@ -3,7 +3,7 @@
 Menu::Menu() 
   : _currentMenu(MENU_MAIN), _currentItem(0), _targetAngle(0), 
     _targetPosition(0), _shouldSave(false), _manualAngleSet(false),
-    _lastAbsoluteAngle(999), _lastMenuChangeTime(0) {
+    _lastAbsoluteAngle(999), _lastMenuChangeTime(0), _digitMode(DIGIT_UNITS) {
 }
 
 int32_t Menu::angleToSteps(uint16_t angle) {
@@ -130,14 +130,47 @@ void Menu::handleStatusMenu(bool buttonPressed) {
   }
 }
 
+void Menu::updateDigitMode(bool digitButtonPressed) {
+  // Обробка натискання кнопки перемикання розрядів
+  static bool lastButtonState = false;
+  
+  if (digitButtonPressed && !lastButtonState) {
+    // Перемикаємо режим редагування розряду
+    _digitMode = (DigitMode)((_digitMode + 1) % 3);
+  }
+  
+  lastButtonState = digitButtonPressed;
+}
+
 void Menu::handleSetAngleMenu(int16_t encoderDelta, bool buttonPressed) {
   // Редагування кута через інкрементальний енкодер з затримкою
   unsigned long now = millis();
+  
+  // При натисканні кнопки енкодера - вихід з меню
+  if (buttonPressed) {
+    _manualAngleSet = true;
+    _currentMenu = MENU_MAIN;
+    _currentItem = ITEM_SET_ANGLE;
+    return;
+  }
+  
+  // Обробка обертання енкодера
   if (encoderDelta != 0 && (now - _lastMenuChangeTime >= MENU_CHANGE_DELAY_MS)) {
-    // Обмежуємо крок до ±1 для плавної зміни
-    int8_t step = (encoderDelta > 0) ? 1 : -1;
+    // Визначаємо крок залежно від вибраного розряду
+    int16_t step = 0;
+    switch (_digitMode) {
+      case DIGIT_UNITS:
+        step = (encoderDelta > 0) ? 1 : -1;  // Одиниці: ±1
+        break;
+      case DIGIT_TENS:
+        step = (encoderDelta > 0) ? 10 : -10;  // Десятки: ±10
+        break;
+      case DIGIT_HUNDREDS:
+        step = (encoderDelta > 0) ? 100 : -100;  // Сотні: ±100
+        break;
+    }
     
-    // Змінюємо кут з кроком 1 градус
+    // Змінюємо кут з відповідним кроком
     int32_t newAngle = (int32_t)_targetAngle + step;
     
     // Обмежуємо в межах 0-360
@@ -162,14 +195,6 @@ void Menu::handleSetAngleMenu(int16_t encoderDelta, bool buttonPressed) {
     
     // Запам'ятовуємо час зміни
     _lastMenuChangeTime = now;
-  }
-  
-  // При натисканні кнопки зберігаємо та повертаємось до головного меню
-  if (buttonPressed) {
-    // Встановлюємо прапорець, що кут встановлений вручну
-    _manualAngleSet = true;
-    _currentMenu = MENU_MAIN;
-    _currentItem = ITEM_STATUS;  // Встановлюємо вибраний пункт на Status
   }
 }
 

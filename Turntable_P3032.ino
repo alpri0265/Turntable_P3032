@@ -13,6 +13,7 @@
 Encoder encoder(ENC_A, ENC_B);
 AbsoluteEncoder absoluteEncoder(ABS_ENC_PIN, 5.0, 360.0);
 Button button(ENC_BTN, BUTTON_DEBOUNCE_MS);
+Button digitModeButton(DIGIT_MODE_BUTTON_PIN, BUTTON_DEBOUNCE_MS);
 
 #if LCD_MODE == 0
   // 4-bit режим
@@ -36,6 +37,7 @@ void setup() {
   encoder.begin();
   absoluteEncoder.begin();
   button.begin();
+  digitModeButton.begin();
   display.begin();
   stepper.begin();
   directionSwitch.begin();
@@ -74,8 +76,14 @@ void loop() {
     menu.updateTargetAngle(absoluteAngle);
   }
   
-  // Перевіряємо кнопку
+  // Перевіряємо кнопки
   bool buttonPressed = button.isPressed();
+  bool digitButtonPressed = digitModeButton.isPressed();
+  
+  // Оновлюємо режим редагування розрядів (тільки в меню Set Angle)
+  if (menu.isEditingAngle()) {
+    menu.updateDigitMode(digitButtonPressed);
+  }
   
   // Оновлюємо навігацію по меню (інкрементальний енкодер + кнопка)
   menu.updateNavigation(encoderDelta, buttonPressed);
@@ -166,9 +174,9 @@ void loop() {
           }
           break;
           
-        case MENU_SET_ANGLE:
-          display.showSetAngleMenu(menu.getTargetAngle());
-          break;
+                case MENU_SET_ANGLE:
+                  display.showSetAngleMenu(menu.getTargetAngle(), menu.getDigitMode());
+                  break;
           
         case MENU_SETTINGS:
           display.showSettingsMenu();

@@ -44,6 +44,14 @@
 // Тумблер перемикання напрямку руху (CW/CCW)
 #define DIRECTION_SWITCH_PIN 5  // Пін для тумблера напрямку
 
+// Кнопка перемикання розрядів (для введення кута вручну)
+// Автоматичне визначення пінів залежно від платформи
+#if defined(ARDUINO_AVR_NANO) || defined(ARDUINO_AVR_UNO)
+  #define DIGIT_MODE_BUTTON_PIN 8  // Пін для кнопки перемикання розрядів (Nano/Uno)
+#else
+  #define DIGIT_MODE_BUTTON_PIN 8  // Пін для кнопки перемикання розрядів (Mega)
+#endif
+
 // Кнопка старт-стоп зі світлодіодом
 // Автоматичне визначення пінів залежно від платформи
 #if defined(ARDUINO_AVR_NANO) || defined(ARDUINO_AVR_UNO)

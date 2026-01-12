@@ -334,17 +334,29 @@ void Display::showStatusMenu(uint32_t position, uint32_t steps360, uint16_t targ
   }
 }
 
-void Display::showSetAngleMenu(uint16_t targetAngle) {
+void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
   static uint16_t lastTargetAngle = 65535;
+  static uint8_t lastDigitMode = 255;
   static bool firstDisplay = true;
   
-  // Оновлюємо тільки якщо змінився кут або це перший виклик
-  if (firstDisplay || lastTargetAngle != targetAngle) {
+  // Оновлюємо тільки якщо змінився кут, режим розряду або це перший виклик
+  if (firstDisplay || lastTargetAngle != targetAngle || lastDigitMode != digitMode) {
     if (firstDisplay) {
       _lcd->clear();
       firstDisplay = false;
     }
     lastTargetAngle = targetAngle;
+    lastDigitMode = digitMode;
+  } else {
+    return; // Нічого не змінилося
+  }
+  
+  // Визначаємо назву режиму розряду
+  const char* modeName = "";
+  switch (digitMode) {
+    case 0: modeName = "Units"; break;
+    case 1: modeName = "Tens"; break;
+    case 2: modeName = "Hundreds"; break;
   }
   
   if (_rows >= 4) {
@@ -360,21 +372,28 @@ void Display::showSetAngleMenu(uint16_t targetAngle) {
     if (_cols >= 20) _lcd->print("      ");
     
     _lcd->setCursor(0, 2);
-    _lcd->print("Rotate encoder to");
-    if (_cols >= 20) _lcd->print("   ");
+    _lcd->print("Mode: ");
+    _lcd->print(modeName);
+    if (_cols >= 20) {
+      for (uint8_t i = 6 + strlen(modeName); i < _cols; i++) {
+        _lcd->print(" ");
+      }
+    }
     
     _lcd->setCursor(0, 3);
-    _lcd->print("change angle");
-    if (_cols >= 20) _lcd->print("        ");
+    _lcd->print("Btn: Change mode");
+    if (_cols >= 20) _lcd->print("     ");
   } else {
     // LCD1602
     _lcd->setCursor(0, 0);
-    _lcd->print("Set Angle:");
-    printAt(10, 0, targetAngle);
+    _lcd->print("Tgt: ");
+    printAt(5, 0, targetAngle);
     _lcd->print((char)223);
+    _lcd->print(" ");
+    _lcd->print(modeName);
     
     _lcd->setCursor(0, 1);
-    _lcd->print("Rotate & press");
+    _lcd->print("Btn: Change mode");
   }
 }
 
