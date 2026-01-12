@@ -1,15 +1,26 @@
 #include "stepper.h"
 
-Stepper::Stepper(uint8_t stepPin, uint8_t dirPin)
-  : _stepPin(stepPin), _dirPin(dirPin), _position(0), 
-    _remaining(0), _lastStepTime(0), _currentDir(0), _directionInvert(false) {
+Stepper::Stepper(uint8_t stepPin, uint8_t dirPin, uint8_t enablePin)
+  : _stepPin(stepPin), _dirPin(dirPin), _enablePin(enablePin), _position(0), 
+    _remaining(0), _lastStepTime(0), _currentStepDelay(STEP_DELAY_ACCEL_US), _currentDir(0), 
+    _directionInvert(false), _distanceToTarget(0), _enabled(true) {
 }
 
 void Stepper::begin() {
   pinMode(_stepPin, OUTPUT);
   pinMode(_dirPin, OUTPUT);
+  pinMode(_enablePin, OUTPUT);
   digitalWrite(_stepPin, LOW);
   digitalWrite(_dirPin, LOW);
+  // ENABLE активний низьким рівнем (LOW = утримується, HIGH = знято з утримання)
+  digitalWrite(_enablePin, LOW);  // Початково утримується
+  _enabled = true;
+}
+
+void Stepper::setEnabled(bool enabled) {
+  _enabled = enabled;
+  // ENABLE активний низьким рівнем: LOW = утримується, HIGH = знято з утримання
+  digitalWrite(_enablePin, enabled ? LOW : HIGH);
 }
 
 void Stepper::setPosition(int32_t position) {
@@ -22,10 +33,15 @@ void Stepper::setPosition(int32_t position) {
   }
   _position = position;
   _remaining = 0;
+  _currentStepDelay = STEP_DELAY_ACCEL_US;  // Скидаємо затримку до початкової
 }
 
 void Stepper::setDirectionInvert(bool invert) {
   _directionInvert = invert;
+}
+
+void Stepper::setDistanceToTarget(int32_t steps) {
+  _distanceToTarget = abs(steps);
 }
 
 int8_t Stepper::getPhysicalDirection(int32_t steps) {
@@ -41,12 +57,18 @@ int8_t Stepper::getPhysicalDirection(int32_t steps) {
 }
 
 void Stepper::update() {
-  if (_remaining == 0) return;
+  if (_remaining == 0) {
+    _currentStepDelay = STEP_DELAY_ACCEL_US;  // Скидаємо затримку при зупинці
+    return;
+  }
+  
+  // Оновлюємо затримку для прискорення/заспілення
+  updateStepDelay();
   
   unsigned long now = micros();
   
   // Перевіряємо, чи минуло достатньо часу для наступного кроку
-  if (now - _lastStepTime >= STEP_DELAY_US) {
+  if (now - _lastStepTime >= _currentStepDelay) {
     doStep();
     _lastStepTime = now;
   }
@@ -55,8 +77,32 @@ void Stepper::update() {
 void Stepper::move(int32_t steps) {
   if (steps == 0) return;
   _remaining += steps;
+  _currentStepDelay = STEP_DELAY_ACCEL_US;  // Починаємо з початкової затримки (прискорення)
   if (_lastStepTime == 0) {
     _lastStepTime = micros();
+  }
+}
+
+void Stepper::updateStepDelay() {
+  // Перевіряємо, чи потрібно заспілення
+  int32_t remainingAbs = abs(_remaining);
+  
+  if (_distanceToTarget > 0 && remainingAbs <= DECEL_START_STEPS) {
+    // Заспілення: збільшуємо затримку при наближенні до цілі
+    // Лінійне збільшення затримки від мінімуму до максимуму
+    // Використовуємо цілочисельну арифметику
+    unsigned long delayRange = STEP_DELAY_MAX_US - STEP_DELAY_MIN_US;
+    unsigned long decelFactor = (remainingAbs * 1000) / DECEL_START_STEPS;  // 0-1000
+    if (decelFactor > 1000) decelFactor = 1000;
+    _currentStepDelay = STEP_DELAY_MIN_US + (delayRange * (1000 - decelFactor)) / 1000;
+  } else if (_currentStepDelay > STEP_DELAY_MIN_US) {
+    // Прискорення: зменшуємо затримку до мінімуму
+    _currentStepDelay -= 10;  // Поступове зменшення
+    if (_currentStepDelay < STEP_DELAY_MIN_US) {
+      _currentStepDelay = STEP_DELAY_MIN_US;
+    }
+  } else {
+    _currentStepDelay = STEP_DELAY_MIN_US;  // Максимальна швидкість
   }
 }
 

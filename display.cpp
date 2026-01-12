@@ -228,10 +228,11 @@ void Display::resetSplashScreen() {
   _splashNeedReset = true;
 }
 
-void Display::showSplashScreen(uint16_t encoderAngle, uint16_t targetAngle, bool isRunning) {
+void Display::showSplashScreen(uint16_t encoderAngle, uint16_t targetAngle, bool isRunning, bool motorEnabled) {
   static uint16_t lastEncoderAngle = 65535;
   static uint16_t lastTargetAngle = 65535;
   static bool lastIsRunning = false;
+  static bool lastMotorEnabled = true;
   static bool firstDisplay = true;
   
   // Якщо потрібно скинути (викликано resetSplashScreen) - робимо це
@@ -241,6 +242,7 @@ void Display::showSplashScreen(uint16_t encoderAngle, uint16_t targetAngle, bool
     lastEncoderAngle = 65535;
     lastTargetAngle = 65535;
     lastIsRunning = !isRunning;
+    lastMotorEnabled = !motorEnabled;  // Примусово оновити
   }
 
   if (firstDisplay) {
@@ -249,15 +251,21 @@ void Display::showSplashScreen(uint16_t encoderAngle, uint16_t targetAngle, bool
     lastEncoderAngle = 65535; // Примусово оновити
     lastTargetAngle = 65535;
     lastIsRunning = !isRunning;
+    lastMotorEnabled = !motorEnabled;  // Примусово оновити
   }
 
   if (_rows >= 4) {
     // LCD2004
-    // Заголовок
-    if (lastEncoderAngle == 65535) {
+    // Заголовок - стан утримання двигуна
+    if (lastEncoderAngle == 65535 || lastMotorEnabled != motorEnabled) {
       _lcd->setCursor(0, 0);
-      _lcd->print("Turntable Ready");
-      if (_cols >= 20) _lcd->print("      ");
+      if (motorEnabled) {
+        _lcd->print("Motor: Hold ON ");
+      } else {
+        _lcd->print("Motor: Released");
+      }
+      if (_cols >= 20) _lcd->print("   ");
+      lastMotorEnabled = motorEnabled;
     }
 
     // Кут з абсолютного енкодера (поточний стан)

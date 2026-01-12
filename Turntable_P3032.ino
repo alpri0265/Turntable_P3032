@@ -13,7 +13,7 @@ Encoder encoder(ENC_A, ENC_B);
 AbsoluteEncoder absoluteEncoder(ABS_ENC_PIN, 5.0, 360.0);
 Button button(ENC_BTN, BUTTON_DEBOUNCE_MS);
 Button digitModeButton(DIGIT_MODE_BUTTON_PIN, BUTTON_DEBOUNCE_MS);
-Button encoderZeroButton(DIRECTION_SWITCH_PIN, BUTTON_DEBOUNCE_MS);  // Кнопка встановлення нуля енкодера
+Button encoderZeroButton(ENCODER_ZERO_BUTTON_PIN, BUTTON_DEBOUNCE_MS);  // Кнопка встановлення нуля енкодера
 
 #if LCD_MODE == 0
   // 4-bit режим
@@ -24,7 +24,7 @@ Button encoderZeroButton(DIRECTION_SWITCH_PIN, BUTTON_DEBOUNCE_MS);  // Кноп
 #endif
 
 Memory memory(MIN_POS, MAX_POS);
-Stepper stepper(STEP_PIN, DIR_PIN);
+Stepper stepper(STEP_PIN, DIR_PIN, ENABLE_PIN);
 Menu menu;
 StartStop startStop(START_STOP_BUTTON_PIN, START_STOP_LED_PIN, BUTTON_DEBOUNCE_MS);
 
@@ -60,7 +60,7 @@ void setup() {
   
   // Показуємо початковий екран (сплеш-екран)
   uint16_t initialEncoderAngle = absoluteEncoder.readAngleInt();
-  display.showSplashScreen(initialEncoderAngle, menu.getTargetAngle(), false);
+  display.showSplashScreen(initialEncoderAngle, menu.getTargetAngle(), false, stepper.isEnabled());
 }
 
 /* ================== LOOP ================== */
@@ -104,28 +104,49 @@ void loop() {
       buttonWasPressed = false;
       longPressDetected = false;
       wasOnSplash = true;
+      buttonPressStartTime = 0;
     }
     
-    bool buttonCurrentlyPressed = button.isCurrentlyPressed();
+    // Використовуємо прямий debounce для стабільності (як в меню)
+    static unsigned long lastDebounceTimeSplash = 0;
+    static bool lastRawStateSplash = HIGH;
+    static bool debouncedStateSplash = HIGH;
+    
+    unsigned long currentTime = millis();
+    bool rawState = digitalRead(ENC_BTN);  // Пряме читання піну (INPUT_PULLUP - LOW = натиснуто)
+    
+    // Простий debounce для визначення стабільного стану
+    if (rawState != lastRawStateSplash) {
+      lastDebounceTimeSplash = currentTime;
+    }
+    lastRawStateSplash = rawState;
+    
+    // Оновлюємо debounced стан якщо пройшло достатньо часу
+    if (currentTime - lastDebounceTimeSplash > BUTTON_DEBOUNCE_MS) {
+      debouncedStateSplash = rawState;
+    }
+    
+    // Для INPUT_PULLUP: LOW = натиснуто, HIGH = відпущено
+    bool buttonCurrentlyPressed = (debouncedStateSplash == LOW);
     
     if (buttonCurrentlyPressed && !buttonWasPressed) {
       // Кнопка тільки що натиснута
-      buttonPressStartTime = millis();
+      buttonPressStartTime = currentTime;
       buttonWasPressed = true;
       longPressDetected = false;
     } else if (buttonCurrentlyPressed && buttonWasPressed) {
-      // Кнопка все ще натиснута - перевіряємо час
-      unsigned long pressDuration = millis() - buttonPressStartTime;
-      if (pressDuration >= 2000 && !longPressDetected) {
-        // Довге натискання виявлено - обнуляємо позицію
+      // Кнопка все ще натиснута - перевіряємо час КОЖНУ ітерацію
+      unsigned long pressDuration = currentTime - buttonPressStartTime;
+      if (pressDuration >= LONG_PRESS_THRESHOLD_MS && !longPressDetected) {
+        // Довге натискання виявлено - перемикаємо утримання двигуна
         longPressDetected = true;
-        stepper.setPosition(0);
-        memory.save(0);
-        display.showMessage("Position", "reset to 0");
+        bool currentState = stepper.isEnabled();
+        stepper.setEnabled(!currentState);
+        display.resetSplashScreen();  // Оновлюємо екран
       }
     } else if (!buttonCurrentlyPressed && buttonWasPressed) {
       // Кнопка відпущена
-      unsigned long pressDuration = millis() - buttonPressStartTime;
+      unsigned long pressDuration = currentTime - buttonPressStartTime;
       buttonWasPressed = false;
       
       // Якщо було довге натискання - не переходимо в меню
@@ -326,8 +347,7 @@ void loop() {
       lastTargetPosition = targetPosition;
     }
     
-    // Перевіряємо, чи досягнуто цільовий кут за допомогою енкодера
-    // Це правильніша логіка - рухаємося поки енкодер не покаже потрібний кут
+    // Перевіряємо, чи досягнуто цільовий кут за допомогою енкодера (для зупинки)
     uint16_t currentEncoderAngle = absoluteEncoder.readAngleInt();
     uint16_t targetAngle = menu.getTargetAngle();
     
@@ -339,35 +359,42 @@ void loop() {
       angleDiff += 360;
     }
     
-    // Якщо досягнуто цільовий кут (допуск ±2 градуси) - вимикаємо двигун
-    if (abs(angleDiff) <= 2) {
+    // Гістерезис для стабільності: якщо вже рухаємося і наближаємося до цілі - не зупиняємося рано
+    static bool wasMoving = false;
+    static int16_t lastAngleDiff = 999;
+    
+    // Якщо досягнуто цільовий кут (допуск ±2 градуси) І (не рухалися або дуже близько) - вимикаємо двигун
+    bool shouldStop = (abs(angleDiff) <= 2) && (!wasMoving || abs(angleDiff) <= 1);
+    
+    if (shouldStop) {
       startStop.setState(false);
       targetChanged = false;
+      wasMoving = false;
+      lastAngleDiff = 999;
     } else {
-      // Якщо ще не досягли цільового кута енкодера - продовжуємо рух
-      // Обчислюємо кроки необхідні для руху до кута енкодера
-      // Використовуємо напрямок на основі різниці кутів
+      // Використовуємо позицію двигуна для обчислення кроків (стабільніше)
+      // Енкодер використовується тільки для зупинки
+      stepper.setDistanceToTarget(abs(stepsNeeded));
+      
       if (stepper.getRemaining() == 0) {
-        // Визначаємо напрямок руху на основі різниці кутів енкодера
-        int32_t stepsToMove = 0;
-        if (abs(angleDiff) > 2) {  // Якщо різниця більше 2 градусів
-          // Обчислюємо кроки на основі різниці кутів
-          // Якщо angleDiff > 0, потрібно рухатися назад (від'ємні кроки)
-          // Якщо angleDiff < 0, потрібно рухатися вперед (додатні кроки)
-          stepsToMove = -angleDiff * STEPS_360 / 360;  // Інвертуємо, бо angleDiff = current - target
-          
+        // Використовуємо обчислені stepsNeeded (на основі позиції двигуна)
+        if (abs(stepsNeeded) > 10) {  // Мінімальний поріг 10 кроків (≈1.1°) для стабільності
           // Обмежуємо максимальну швидкість руху (не більше 180° за раз)
+          int32_t stepsToMove = stepsNeeded;
           if (stepsToMove > STEPS_360 / 2) {
             stepsToMove = STEPS_360 / 2;
           } else if (stepsToMove < -STEPS_360 / 2) {
             stepsToMove = -STEPS_360 / 2;
           }
           
-          if (abs(stepsToMove) > 0) {
-            stepper.move(stepsToMove);
-            targetChanged = false;
-          }
+          stepper.move(stepsToMove);
+          targetChanged = false;
+          wasMoving = true;
+        } else {
+          wasMoving = false;
         }
+      } else {
+        wasMoving = true;
       }
     }
   } else {
@@ -428,7 +455,8 @@ void loop() {
             display.showSplashScreen(
               encoderAngle,
               menu.getTargetAngle(),
-              startStop.getState()
+              startStop.getState(),
+              stepper.isEnabled()
             );
           }
           break;

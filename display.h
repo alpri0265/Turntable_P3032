@@ -28,7 +28,7 @@ public:
   void clear();
   
   // Відображення меню
-  void showSplashScreen(uint16_t encoderAngle, uint16_t targetAngle, bool isRunning);
+  void showSplashScreen(uint16_t encoderAngle, uint16_t targetAngle, bool isRunning, bool motorEnabled);
   void resetSplashScreen(); // Скидання стану сплеш-екрану при поверненні
   void showMainMenu(uint8_t selectedItem);
   void showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode);

@@ -20,8 +20,12 @@ private:
   unsigned long _lastReadTime;
   float _zeroOffset;  // Зсув для встановлення нуля
   static const unsigned long READ_INTERVAL_MS = 10;  // Інтервал читання
+  static const uint8_t FILTER_SAMPLES = 8;  // Кількість зразків для фільтрації
+  float _filterBuffer[FILTER_SAMPLES];  // Буфер для фільтрації
+  uint8_t _filterIndex;  // Індекс для буфера фільтрації
   
   float readRawAngle();  // Читає сире значення кута без урахування offset
+  float readRawAngleFiltered();  // Читає сире значення з фільтрацією
 };
 
 #endif
