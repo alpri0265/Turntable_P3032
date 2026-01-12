@@ -3,7 +3,7 @@
 Menu::Menu() 
   : _currentMenu(MENU_MAIN), _currentItem(0), _targetAngle(0), 
     _targetPosition(0), _shouldSave(false), _manualAngleSet(false),
-    _lastAbsoluteAngle(999) {
+    _lastAbsoluteAngle(999), _lastMenuChangeTime(0) {
 }
 
 int32_t Menu::angleToSteps(uint16_t angle) {
@@ -86,15 +86,21 @@ void Menu::updateNavigation(int16_t encoderDelta, bool buttonPressed) {
 }
 
 void Menu::handleMainMenu(int16_t encoderDelta, bool buttonPressed) {
-  // Навігація по головному меню
-  if (encoderDelta != 0) {
-    _currentItem += encoderDelta;
+  // Навігація по головному меню з затримкою для плавної навігації
+  unsigned long now = millis();
+  if (encoderDelta != 0 && (now - _lastMenuChangeTime >= MENU_CHANGE_DELAY_MS)) {
+    // Обмежуємо крок до ±1 для плавної навігації
+    int8_t step = (encoderDelta > 0) ? 1 : -1;
+    _currentItem += step;
     
     // Обмежуємо в межах меню
     if (_currentItem < 0)
       _currentItem = ITEM_COUNT - 1;
     else if (_currentItem >= ITEM_COUNT)
       _currentItem = 0;
+    
+    // Запам'ятовуємо час зміни
+    _lastMenuChangeTime = now;
   }
   
   // Обробка вибору пункту
@@ -125,10 +131,14 @@ void Menu::handleStatusMenu(bool buttonPressed) {
 }
 
 void Menu::handleSetAngleMenu(int16_t encoderDelta, bool buttonPressed) {
-  // Редагування кута через інкрементальний енкодер
-  if (encoderDelta != 0) {
+  // Редагування кута через інкрементальний енкодер з затримкою
+  unsigned long now = millis();
+  if (encoderDelta != 0 && (now - _lastMenuChangeTime >= MENU_CHANGE_DELAY_MS)) {
+    // Обмежуємо крок до ±1 для плавної зміни
+    int8_t step = (encoderDelta > 0) ? 1 : -1;
+    
     // Змінюємо кут з кроком 1 градус
-    int32_t newAngle = (int32_t)_targetAngle + encoderDelta;
+    int32_t newAngle = (int32_t)_targetAngle + step;
     
     // Обмежуємо в межах 0-360
     if (newAngle < 0) {
@@ -149,6 +159,9 @@ void Menu::handleSetAngleMenu(int16_t encoderDelta, bool buttonPressed) {
     
     // Встановлюємо прапорець, що кут встановлений вручну
     _manualAngleSet = true;
+    
+    // Запам'ятовуємо час зміни
+    _lastMenuChangeTime = now;
   }
   
   // При натисканні кнопки зберігаємо та повертаємось до головного меню

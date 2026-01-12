@@ -69,6 +69,8 @@ private:
   bool _shouldSave;
   bool _manualAngleSet;  // Прапорець, що кут встановлений вручну
   uint16_t _lastAbsoluteAngle;  // Останнє значення абсолютного енкодера
+  unsigned long _lastMenuChangeTime;  // Час останньої зміни пункту меню
+  static const unsigned long MENU_CHANGE_DELAY_MS = 150;  // Затримка між змінами пунктів меню
   
   int32_t angleToSteps(uint16_t angle);
   void handleMainMenu(int16_t encoderDelta, bool buttonPressed);
