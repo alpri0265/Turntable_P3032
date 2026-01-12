@@ -34,6 +34,13 @@
 #define STEP_PIN 6
 #define DIR_PIN  7
 
+// Перемикач напрямку руху (CW/CCW)
+#define DIRECTION_SWITCH_PIN 5  // Пін для перемикача напрямку
+
+// Кнопка старт-стоп зі світлодіодом
+#define START_STOP_BUTTON_PIN 22  // Пін для кнопки старт-стоп
+#define START_STOP_LED_PIN 23     // Пін для світлодіода старт-стоп
+
 /* ================== МЕХАНІКА ================== */
 #define STEPS_PER_REV 200
 #define MICROSTEP     16

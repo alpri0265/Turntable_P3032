@@ -2,7 +2,7 @@
 
 Stepper::Stepper(uint8_t stepPin, uint8_t dirPin)
   : _stepPin(stepPin), _dirPin(dirPin), _position(0), 
-    _remaining(0), _lastStepTime(0), _currentDir(0) {
+    _remaining(0), _lastStepTime(0), _currentDir(0), _directionInvert(false) {
 }
 
 void Stepper::begin() {
@@ -15,6 +15,22 @@ void Stepper::begin() {
 void Stepper::setPosition(int32_t position) {
   _position = position;
   _remaining = 0;
+}
+
+void Stepper::setDirectionInvert(bool invert) {
+  _directionInvert = invert;
+}
+
+int8_t Stepper::getPhysicalDirection(int32_t steps) {
+  // Визначаємо логічний напрямок
+  int8_t logicalDir = (steps > 0) ? 1 : -1;
+  
+  // Застосовуємо інверсію, якщо потрібно
+  if (_directionInvert) {
+    logicalDir = -logicalDir;
+  }
+  
+  return logicalDir;
 }
 
 void Stepper::update() {
@@ -38,8 +54,10 @@ void Stepper::move(int32_t steps) {
 }
 
 void Stepper::doStep() {
+  // Визначаємо фізичний напрямок з урахуванням інверсії
+  int8_t newDir = getPhysicalDirection(_remaining);
+  
   // Встановлюємо напрямок (тільки якщо змінився)
-  int8_t newDir = (_remaining > 0) ? 1 : -1;
   if (_currentDir != newDir) {
     digitalWrite(_dirPin, newDir > 0 ? HIGH : LOW);
     _currentDir = newDir;
@@ -54,7 +72,7 @@ void Stepper::doStep() {
   while (micros() - pulseStart < STEP_PULSE_US) {} // чекаємо 4 мкс
   digitalWrite(_stepPin, LOW);
   
-  // Оновлюємо позицію
+  // Оновлюємо позицію (логічно, без інверсії)
   if (_remaining > 0) {
     _remaining--;
     _position++;

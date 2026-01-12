@@ -1,5 +1,6 @@
 #include "display.h"
 #include "config.h"
+#include <string.h>
 
 #if LCD_MODE == 0
 // Конструктор для 4-bit режиму
@@ -171,5 +172,160 @@ void Display::drawWithTarget(uint32_t position, uint32_t steps360, uint16_t targ
     printAt(5, 1, targetAngle);
     _lcd->print((char)223); // °
     _lcd->print("  ");
+  }
+}
+
+void Display::printMenuItem(uint8_t row, uint8_t itemIndex, const char* text, bool selected) {
+  _lcd->setCursor(0, row);
+  if (selected) {
+    _lcd->print(">");
+  } else {
+    _lcd->print(" ");
+  }
+  _lcd->print(text);
+  // Очищаємо решту рядка
+  uint8_t len = strlen(text);
+  for (uint8_t i = len + 1; i < _cols; i++) {
+    _lcd->print(" ");
+  }
+}
+
+void Display::showMainMenu(uint8_t selectedItem) {
+  _lcd->clear();
+  
+  if (_rows >= 4) {
+    // LCD2004 - показуємо всі пункти
+    _lcd->setCursor(0, 0);
+    _lcd->print("Main Menu");
+    if (_cols >= 20) _lcd->print("           ");
+    
+    printMenuItem(1, 0, "Status", selectedItem == 0);
+    printMenuItem(2, 1, "Settings", selectedItem == 1);
+    printMenuItem(3, 2, "Save Position", selectedItem == 2);
+  } else {
+    // LCD1602 - показуємо по 2 пункти
+    if (selectedItem == 0) {
+      printMenuItem(0, 0, "Status", true);
+      printMenuItem(1, 1, "Settings", false);
+    } else if (selectedItem == 1) {
+      printMenuItem(0, 0, "Status", false);
+      printMenuItem(1, 1, "Settings", true);
+    } else {
+      printMenuItem(0, 1, "Settings", false);
+      printMenuItem(1, 2, "Save Position", true);
+    }
+  }
+}
+
+void Display::showStatusMenu(uint32_t position, uint32_t steps360, uint16_t targetAngle, bool positionReached, bool directionCCW) {
+  uint16_t currentDeg = (uint32_t)position * 360 / steps360;
+  
+  if (_rows >= 4) {
+    // LCD2004
+    _lcd->setCursor(0, 0);
+    _lcd->print("Status");
+    if (_cols >= 20) _lcd->print("              ");
+    
+    _lcd->setCursor(0, 1);
+    _lcd->print("Current: ");
+    printAt(9, 1, currentDeg);
+    _lcd->print((char)223);
+    if (_cols >= 20) _lcd->print("      ");
+    
+    _lcd->setCursor(0, 2);
+    _lcd->print("Target:  ");
+    printAt(9, 2, targetAngle);
+    _lcd->print((char)223);
+    if (_cols >= 20) _lcd->print("      ");
+    
+    _lcd->setCursor(0, 3);
+    if (positionReached) {
+      _lcd->print("Pos: OK ");
+    } else {
+      _lcd->print("Pos: Moving ");
+    }
+    // Показуємо напрямок
+    if (directionCCW) {
+      _lcd->print("CCW");
+    } else {
+      _lcd->print("CW ");
+    }
+    if (_cols >= 20) _lcd->print("   ");
+  } else {
+    // LCD1602
+    _lcd->setCursor(0, 0);
+    _lcd->print("Cur: ");
+    printAt(5, 0, currentDeg);
+    _lcd->print((char)223);
+    // Показуємо напрямок
+    if (directionCCW) {
+      _lcd->print(" CCW");
+    } else {
+      _lcd->print(" CW ");
+    }
+    
+    _lcd->setCursor(0, 1);
+    _lcd->print("Tgt: ");
+    printAt(5, 1, targetAngle);
+    _lcd->print((char)223);
+    if (positionReached) {
+      _lcd->print(" OK");
+    } else {
+      _lcd->print(" ->");
+    }
+  }
+}
+
+void Display::showSettingsMenu() {
+  _lcd->clear();
+  
+  if (_rows >= 4) {
+    _lcd->setCursor(0, 0);
+    _lcd->print("Settings");
+    if (_cols >= 20) _lcd->print("            ");
+    
+    _lcd->setCursor(0, 1);
+    _lcd->print("(Not implemented)");
+    if (_cols >= 20) _lcd->print("    ");
+    
+    _lcd->setCursor(0, 2);
+    _lcd->print("Press button to");
+    if (_cols >= 20) _lcd->print("     ");
+    
+    _lcd->setCursor(0, 3);
+    _lcd->print("return");
+    if (_cols >= 20) _lcd->print("              ");
+  } else {
+    _lcd->setCursor(0, 0);
+    _lcd->print("Settings");
+    _lcd->setCursor(0, 1);
+    _lcd->print("Press to return");
+  }
+}
+
+void Display::showSaveMenu() {
+  _lcd->clear();
+  
+  if (_rows >= 4) {
+    _lcd->setCursor(0, 0);
+    _lcd->print("Save Position");
+    if (_cols >= 20) _lcd->print("        ");
+    
+    _lcd->setCursor(0, 1);
+    _lcd->print("Current position");
+    if (_cols >= 20) _lcd->print("     ");
+    
+    _lcd->setCursor(0, 2);
+    _lcd->print("will be saved");
+    if (_cols >= 20) _lcd->print("       ");
+    
+    _lcd->setCursor(0, 3);
+    _lcd->print("Press to confirm");
+    if (_cols >= 20) _lcd->print("    ");
+  } else {
+    _lcd->setCursor(0, 0);
+    _lcd->print("Save Position");
+    _lcd->setCursor(0, 1);
+    _lcd->print("Press to confirm");
   }
 }

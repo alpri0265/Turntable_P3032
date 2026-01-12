@@ -1,6 +1,8 @@
 #include "menu.h"
 
-Menu::Menu() : _shouldSave(false), _targetAngle(0) {
+Menu::Menu() 
+  : _currentMenu(MENU_MAIN), _currentItem(0), _targetAngle(0), 
+    _targetPosition(0), _shouldSave(false) {
 }
 
 int32_t Menu::angleToSteps(uint16_t angle) {
@@ -8,41 +10,7 @@ int32_t Menu::angleToSteps(uint16_t angle) {
   return (int32_t)angle * STEPS_360 / 360;
 }
 
-void Menu::syncAngleFromPosition(int32_t position) {
-  // Конвертуємо позицію (кроки) в кут
-  _targetAngle = (uint32_t)position * 360 / STEPS_360;
-}
-
-void Menu::update(int16_t encoderDelta, bool buttonPressed, 
-                  int32_t& targetPosition, int32_t currentPos, int32_t remaining) {
-  // Обробка енкодера
-  if (encoderDelta != 0) {
-    // Обчислюємо цільову позицію з урахуванням поточної позиції та черги кроків
-    int32_t newTarget = currentPos + remaining + encoderDelta;
-
-    // Обмежуємо позицію в межах дозволеного діапазону
-    if (newTarget < MIN_POS)
-      newTarget = MIN_POS;
-    else if (newTarget > MAX_POS)
-      newTarget = MAX_POS;
-
-    // Обчислюємо скільки кроків потрібно додати до черги
-    int32_t stepsToAdd = newTarget - currentPos - remaining;
-    
-    if (stepsToAdd != 0) {
-      targetPosition = newTarget;
-      _targetAngle = (uint32_t)newTarget * 360 / STEPS_360;
-    }
-  }
-  
-  // Обробка кнопки
-  if (buttonPressed) {
-    _shouldSave = true;
-  }
-}
-
-void Menu::updateWithAbsoluteEncoder(uint16_t absoluteAngle, bool buttonPressed,
-                                     int32_t& targetPosition, int32_t currentPos, int32_t remaining) {
+void Menu::updateTargetAngle(uint16_t absoluteAngle) {
   // Встановлюємо цільовий кут з абсолютного енкодера
   _targetAngle = absoluteAngle;
   
@@ -56,10 +24,85 @@ void Menu::updateWithAbsoluteEncoder(uint16_t absoluteAngle, bool buttonPressed,
     newTarget = MAX_POS;
   
   // Встановлюємо цільову позицію
-  targetPosition = newTarget;
+  _targetPosition = newTarget;
+}
+
+void Menu::updateNavigation(int16_t encoderDelta, bool buttonPressed) {
+  // Обробка навігації залежно від поточного меню
+  switch (_currentMenu) {
+    case MENU_MAIN:
+      handleMainMenu(encoderDelta, buttonPressed);
+      break;
+    case MENU_STATUS:
+      handleStatusMenu(buttonPressed);
+      break;
+    case MENU_SETTINGS:
+      handleSettingsMenu(encoderDelta, buttonPressed);
+      break;
+    case MENU_SAVE:
+      handleSaveMenu(buttonPressed);
+      break;
+  }
+}
+
+void Menu::handleMainMenu(int16_t encoderDelta, bool buttonPressed) {
+  // Навігація по головному меню
+  if (encoderDelta != 0) {
+    _currentItem += encoderDelta;
+    
+    // Обмежуємо в межах меню
+    if (_currentItem < 0)
+      _currentItem = ITEM_COUNT - 1;
+    else if (_currentItem >= ITEM_COUNT)
+      _currentItem = 0;
+  }
   
-  // Обробка кнопки
+  // Обробка вибору пункту
+  if (buttonPressed) {
+    switch (_currentItem) {
+      case ITEM_STATUS:
+        _currentMenu = MENU_STATUS;
+        break;
+      case ITEM_SETTINGS:
+        _currentMenu = MENU_SETTINGS;
+        break;
+      case ITEM_SAVE:
+        _currentMenu = MENU_SAVE;
+        break;
+    }
+  }
+}
+
+void Menu::handleStatusMenu(bool buttonPressed) {
+  // Повернення до головного меню
+  if (buttonPressed) {
+    _currentMenu = MENU_MAIN;
+    _currentItem = ITEM_STATUS;
+  }
+}
+
+void Menu::handleSettingsMenu(int16_t encoderDelta, bool buttonPressed) {
+  // Налаштування (можна розширити)
+  if (buttonPressed) {
+    _currentMenu = MENU_MAIN;
+    _currentItem = ITEM_SETTINGS;
+  }
+}
+
+void Menu::handleSaveMenu(bool buttonPressed) {
+  // Підтвердження збереження
   if (buttonPressed) {
     _shouldSave = true;
+    _currentMenu = MENU_MAIN;
+    _currentItem = ITEM_SAVE;
   }
+}
+
+bool Menu::isPositionReached(int32_t currentPos, int32_t remaining) const {
+  // Перевіряємо, чи поточна позиція відповідає цільовій
+  int32_t effectivePos = currentPos + remaining;
+  int32_t diff = abs(effectivePos - _targetPosition);
+  
+  // Вважаємо досягнутою, якщо різниця менше 2 кроків
+  return diff < 2;
 }

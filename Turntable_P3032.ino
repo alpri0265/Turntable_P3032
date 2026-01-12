@@ -6,6 +6,7 @@
 #include "memory.h"
 #include "stepper.h"
 #include "menu.h"
+#include "direction_switch.h"
 
 /* ================== ОБʼЄКТИ ================== */
 Encoder encoder(ENC_A, ENC_B);
@@ -23,9 +24,10 @@ Button button(ENC_BTN, BUTTON_DEBOUNCE_MS);
 Memory memory(MIN_POS, MAX_POS);
 Stepper stepper(STEP_PIN, DIR_PIN);
 Menu menu;
+DirectionSwitch directionSwitch(DIRECTION_SWITCH_PIN);
 
 /* ================== ЗМІННІ ================== */
-int32_t targetPosition = 0;
+unsigned long lastDisplayUpdate = 0;
 
 /* ================== SETUP ================== */
 void setup() {
@@ -34,44 +36,43 @@ void setup() {
   button.begin();
   display.begin();
   stepper.begin();
+  directionSwitch.begin();
   
   // Завантажуємо позицію з пам'яті
-  memory.load(targetPosition);
-  stepper.setPosition(targetPosition);
+  int32_t savedPosition = 0;
+  memory.load(savedPosition);
+  stepper.setPosition(savedPosition);
   
   // Встановлюємо початковий цільовий кут з абсолютного енкодера
   uint16_t initialAngle = absoluteEncoder.readAngleInt();
-  menu.updateWithAbsoluteEncoder(initialAngle, false, targetPosition, 
-                                  stepper.getPosition(), stepper.getRemaining());
+  menu.updateTargetAngle(initialAngle);
   
-  // Показуємо початковий екран
-  display.updateWithTarget(stepper.getPosition(), STEPS_360, menu.getTargetAngle());
+  // Показуємо початковий екран (головне меню)
+  display.showMainMenu(menu.getCurrentItem());
 }
 
 /* ================== LOOP ================== */
 void loop() {
-  // Читаємо інкрементальний енкодер (для точного позиціонування)
+  // Читаємо інкрементальний енкодер (для навігації по меню)
   int16_t encoderDelta = encoder.read();
   
-  // Читаємо абсолютний енкодер P3022-CW360 (для встановлення цільового кута)
+  // Читаємо абсолютний енкодер P3022-CW360 (встановлює цільовий кут)
   uint16_t absoluteAngle = absoluteEncoder.readAngleInt();
+  menu.updateTargetAngle(absoluteAngle);
   
   // Перевіряємо кнопку
   bool buttonPressed = button.isPressed();
   
-  // Оновлюємо меню з абсолютним енкодером (встановлює цільовий кут)
-  menu.updateWithAbsoluteEncoder(absoluteAngle, buttonPressed, targetPosition, 
-                                  stepper.getPosition(), stepper.getRemaining());
+  // Оновлюємо навігацію по меню (інкрементальний енкодер + кнопка)
+  menu.updateNavigation(encoderDelta, buttonPressed);
   
-  // Дозволяємо також використовувати інкрементальний енкодер для точного налаштування
-  if (encoderDelta != 0) {
-    int32_t newTarget = targetPosition + encoderDelta;
-    if (newTarget < MIN_POS) newTarget = MIN_POS;
-    else if (newTarget > MAX_POS) newTarget = MAX_POS;
-    targetPosition = newTarget;
-    // Синхронізуємо кут в меню з нової позиції
-    menu.syncAngleFromPosition(targetPosition);
-  }
+  // Читаємо перемикач напрямку та встановлюємо інверсію
+  static RotationDirection currentDirection = DIR_CW;
+  currentDirection = directionSwitch.read();
+  stepper.setDirectionInvert(currentDirection == DIR_CCW);
+  
+  // Отримуємо цільову позицію з меню
+  int32_t targetPosition = menu.getTargetPosition();
   
   // Виконуємо рух до цільової позиції
   int32_t stepsNeeded = targetPosition - stepper.getPosition() - stepper.getRemaining();
@@ -83,12 +84,58 @@ void loop() {
   stepper.update();
   
   // Обробка збереження
+  static unsigned long saveMessageTime = 0;
   if (menu.shouldSave()) {
     memory.save(stepper.getPosition());
     menu.clearSaveFlag();
-    display.showMessage("Manual mode   ", "Saved to EEPROM");
+    display.showMessage("Position saved", "to EEPROM");
+    saveMessageTime = millis();
   }
   
-  // Оновлюємо дисплей з поточним та цільовим кутом
-  display.updateWithTarget(stepper.getPosition(), STEPS_360, menu.getTargetAngle());
+  // Оновлюємо дисплей залежно від поточного меню
+  unsigned long now = millis();
+  
+  // Перевіряємо, чи показується повідомлення про збереження
+  if (saveMessageTime > 0 && (now - saveMessageTime < 1000)) {
+    // Повідомлення вже відображається
+  } else {
+    if (saveMessageTime > 0) {
+      saveMessageTime = 0; // Повідомлення приховано
+    }
+    
+    // Оновлюємо меню
+    if (now - lastDisplayUpdate > LCD_UPDATE_MS) {
+      switch (menu.getCurrentMenu()) {
+        case MENU_MAIN:
+          display.showMainMenu(menu.getCurrentItem());
+          break;
+          
+        case MENU_STATUS:
+          {
+            bool positionReached = menu.isPositionReached(
+              stepper.getPosition(), 
+              stepper.getRemaining()
+            );
+            bool directionCCW = (currentDirection == DIR_CCW);
+            display.showStatusMenu(
+              stepper.getPosition(), 
+              STEPS_360, 
+              menu.getTargetAngle(),
+              positionReached,
+              directionCCW
+            );
+          }
+          break;
+          
+        case MENU_SETTINGS:
+          display.showSettingsMenu();
+          break;
+          
+        case MENU_SAVE:
+          display.showSaveMenu();
+          break;
+      }
+      lastDisplayUpdate = now;
+    }
+  }
 }

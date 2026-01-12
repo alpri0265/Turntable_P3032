@@ -27,6 +27,12 @@ public:
   void showAngle(uint32_t position, uint32_t steps360);
   void clear();
   
+  // Відображення меню
+  void showMainMenu(uint8_t selectedItem);
+  void showStatusMenu(uint32_t position, uint32_t steps360, uint16_t targetAngle, bool positionReached, bool directionCCW);
+  void showSettingsMenu();
+  void showSaveMenu();
+  
 private:
   #if LCD_MODE == 0
     LiquidCrystal* _lcd;
@@ -48,6 +54,7 @@ private:
   void drawWithTarget(uint32_t position, uint32_t steps360, uint16_t targetAngle);
   void printAt(uint8_t col, uint8_t row, const char* text);
   void printAt(uint8_t col, uint8_t row, uint16_t value);
+  void printMenuItem(uint8_t row, uint8_t itemIndex, const char* text, bool selected);
 };
 
 #endif
