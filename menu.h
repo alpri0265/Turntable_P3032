@@ -86,8 +86,14 @@ public:
   // Отримання вибраного напрямку руху
   RotationDirection getDirection() const { return _selectedDirection; }
   
+  // Встановлення напрямку руху (викликається при завантаженні з пам'яті)
+  void setDirection(RotationDirection direction);
+  
   // Встановлення нульової позиції двигуна (викликається при обнуленні енкодера)
   void setStepperZeroPosition(int32_t zeroPosition);
+  
+  // Отримання нульової позиції двигуна
+  int32_t getStepperZeroPosition() const { return _stepperZeroPosition; }
   
   // Обробка довгого натискання кнопки (повернення на сплеш-екран)
   void handleLongPress();

@@ -42,9 +42,12 @@ void setup() {
   stepper.begin();
   startStop.begin();
   
-  // Завантажуємо позицію з пам'яті
+  // Завантажуємо налаштування з пам'яті (позиція, напрямок, нуль енкодера)
   int32_t savedPosition = 0;
-  memory.load(savedPosition);
+  uint8_t savedDirection = 0;  // DIR_CW = 0
+  int32_t savedStepperZero = 0;
+  memory.loadSettings(savedPosition, savedDirection, savedStepperZero);
+  
   // Нормалізуємо позицію до діапазону 0-360 градусів перед встановленням
   while (savedPosition < 0) {
     savedPosition += STEPS_360;
@@ -53,6 +56,12 @@ void setup() {
     savedPosition -= STEPS_360;
   }
   stepper.setPosition(savedPosition);
+  
+  // Встановлюємо напрямок руху
+  menu.setDirection((RotationDirection)savedDirection);
+  
+  // Встановлюємо нульову позицію двигуна
+  menu.setStepperZeroPosition(savedStepperZero);
   
   // Встановлюємо початковий цільовий кут з абсолютного енкодера
   uint16_t initialAngle = absoluteEncoder.readAngleInt();
@@ -293,8 +302,10 @@ void loop() {
     // Встановлюємо нуль енкодера (тепер кут 0°)
     absoluteEncoder.setZero();
     
-    // Зберігаємо поточну позицію в пам'ять
-    memory.save(currentPosition);
+    // Зберігаємо поточну позицію, напрямок та нуль в пам'ять
+    uint8_t currentDirection = (uint8_t)menu.getDirection();
+    int32_t currentStepperZero = menu.getStepperZeroPosition();
+    memory.saveSettings(currentPosition, currentDirection, currentStepperZero);
     
     // Відновлюємо збережений цільовий кут (100°) - він залишається незмінним
     menu.setTargetAngle(savedTargetAngle);
@@ -412,7 +423,10 @@ void loop() {
   // Обробка збереження
   static unsigned long saveMessageTime = 0;
   if (menu.shouldSave()) {
-    memory.save(stepper.getPosition());
+    int32_t currentPosition = stepper.getPosition();
+    uint8_t currentDirection = (uint8_t)menu.getDirection();
+    int32_t currentStepperZero = menu.getStepperZeroPosition();
+    memory.saveSettings(currentPosition, currentDirection, currentStepperZero);
     menu.clearSaveFlag();
     display.showMessage("Position saved", "to EEPROM");
     saveMessageTime = millis();

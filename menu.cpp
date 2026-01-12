@@ -60,6 +60,10 @@ void Menu::resetManualAngleFlag() {
   _manualAngleSet = false;
 }
 
+void Menu::setDirection(RotationDirection direction) {
+  _selectedDirection = direction;
+}
+
 void Menu::setStepperZeroPosition(int32_t zeroPosition) {
   // Встановлюємо нульову позицію двигуна (відносно якої обчислюється цільовий кут)
   // Нормалізуємо до діапазону 0-360 градусів
