@@ -151,47 +151,73 @@ void loop() {
     MenuType currentMenuBefore = menu.getCurrentMenu();
     
     // ========== ОБРОБКА КНОПКИ ЕНКОДЕРА ДЛЯ МЕНЮ ==========
+    // Використовуємо окрему логіку з прямим читанням піну для стабільності
     static unsigned long buttonPressStartTimeMenu = 0;
     static bool buttonWasPressedMenu = false;
-    static bool longPressHandledMenu = false;
+    static bool longPressDetectedMenu = false;
+    static unsigned long lastDebounceTime = 0;
+    static bool lastRawState = HIGH;
+    static bool debouncedState = HIGH;
     
-    bool buttonCurrentlyPressed = !digitalRead(ENC_BTN); // Пряме читання піну для довгого натискання
+    unsigned long currentTime = millis();
+    bool buttonPressedForMenu = false;  // Прапорець короткого натискання для меню
     
-    // Відстежуємо натискання кнопки
-    if (buttonCurrentlyPressed && !buttonWasPressedMenu) {
-      buttonPressStartTimeMenu = millis();
-      buttonWasPressedMenu = true;
-      longPressHandledMenu = false;
+    // Пряме читання піну (INPUT_PULLUP - LOW = натиснуто)
+    bool rawState = digitalRead(ENC_BTN);
+    
+    // Простий debounce для визначення стабільного стану
+    if (rawState != lastRawState) {
+      lastDebounceTime = currentTime;
+    }
+    lastRawState = rawState;
+    
+    // Оновлюємо debounced стан якщо пройшло достатньо часу
+    if (currentTime - lastDebounceTime > BUTTON_DEBOUNCE_MS) {
+      debouncedState = rawState;
     }
     
-    // Перевіряємо довге натискання (2 секунди)
-    if (buttonCurrentlyPressed && buttonWasPressedMenu && !longPressHandledMenu) {
-      unsigned long pressDuration = millis() - buttonPressStartTimeMenu;
-      if (pressDuration >= LONG_PRESS_THRESHOLD_MS) {
+    // Для INPUT_PULLUP: LOW = натиснуто, HIGH = відпущено
+    bool buttonCurrentlyPressed = (debouncedState == LOW);
+    
+    // Відстежуємо початок натискання кнопки (перехід з false в true)
+    if (buttonCurrentlyPressed && !buttonWasPressedMenu) {
+      // Початок натискання - фіксуємо час
+      buttonPressStartTimeMenu = currentTime;
+      buttonWasPressedMenu = true;
+      longPressDetectedMenu = false;
+    }
+    
+    // Перевіряємо довге натискання КОЖНУ ітерацію loop, поки кнопка натиснута
+    if (buttonCurrentlyPressed && buttonWasPressedMenu) {
+      unsigned long pressDuration = currentTime - buttonPressStartTimeMenu;
+      
+      // Перевірка довгого натискання (>= 2 секунди)
+      if (pressDuration >= LONG_PRESS_THRESHOLD_MS && !longPressDetectedMenu) {
         // ДОВГЕ НАТИСКАННЯ - повернення на сплеш-екран
-        longPressHandledMenu = true;
+        longPressDetectedMenu = true;
         menu.handleLongPress();
         display.resetSplashScreen();
         menu.clearResetSplashFlag();
         lastDisplayUpdate = 0;
-        buttonWasPressedMenu = false;
       }
     }
     
-    if (!buttonCurrentlyPressed) {
+    // Обробка відпускання кнопки (перехід з true в false)
+    if (!buttonCurrentlyPressed && buttonWasPressedMenu) {
+      unsigned long pressDuration = currentTime - buttonPressStartTimeMenu;
+      
+      // Коротке натискання: більше debounce, але менше довгого, і НЕ було виявлено довгого
+      if (!longPressDetectedMenu && pressDuration < LONG_PRESS_THRESHOLD_MS && pressDuration >= BUTTON_DEBOUNCE_MS) {
+        buttonPressedForMenu = true;
+      }
+      
+      // Скидаємо всі прапорці після відпускання
       buttonWasPressedMenu = false;
-      longPressHandledMenu = false;
+      longPressDetectedMenu = false;
     }
     
-    // КОРОТКЕ натискання через debounce (якщо не було довгого)
-    bool buttonPressed = button.isPressed();
-    if (buttonPressed && !longPressHandledMenu) {
-      // Оновлюємо навігацію по меню (інкрементальний енкодер + кнопка)
-      menu.updateNavigation(encoderDelta, true);
-    } else {
-      // Оновлюємо тільки навігацію енкодером
-      menu.updateNavigation(encoderDelta, false);
-    }
+    // Оновлюємо навігацію по меню
+    menu.updateNavigation(encoderDelta, buttonPressedForMenu);
     
     // Перевіряємо, чи змінилося меню на сплеш-екран
     MenuType currentMenuAfter = menu.getCurrentMenu();
