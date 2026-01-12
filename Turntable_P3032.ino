@@ -97,7 +97,7 @@ void loop() {
   
   bool isOnSplash = (menu.getCurrentMenu() == MENU_SPLASH);
   
-  // Обробка сплеш-екрану
+  // Обробка сплеш-екрану - ВИКОРИСТОВУЄМО ТОЧНО ТУ САМУ ЛОГІКУ, ЩО І В МЕНЮ
   if (isOnSplash) {
     // Скидаємо стан при виході з сплеш-екрану і поверненні
     if (!wasOnSplash) {
@@ -107,7 +107,7 @@ void loop() {
       buttonPressStartTime = 0;
     }
     
-    // Використовуємо прямий debounce для стабільності (як в меню)
+    // ========== ОБРОБКА КНОПКИ ЕНКОДЕРА ДЛЯ СПЛЕШ-ЕКРАНУ (ТОЧНА КОПІЯ ЛОГІКИ З МЕНЮ) ==========
     static unsigned long lastDebounceTimeSplash = 0;
     static bool lastRawStateSplash = HIGH;
     static bool debouncedStateSplash = HIGH;
@@ -129,31 +129,38 @@ void loop() {
     // Для INPUT_PULLUP: LOW = натиснуто, HIGH = відпущено
     bool buttonCurrentlyPressed = (debouncedStateSplash == LOW);
     
+    // Відстежуємо початок натискання кнопки (перехід з false в true)
     if (buttonCurrentlyPressed && !buttonWasPressed) {
-      // Кнопка тільки що натиснута
+      // Початок натискання - фіксуємо час
       buttonPressStartTime = currentTime;
       buttonWasPressed = true;
       longPressDetected = false;
-    } else if (buttonCurrentlyPressed && buttonWasPressed) {
-      // Кнопка все ще натиснута - перевіряємо час КОЖНУ ітерацію
+    }
+    
+    // Перевіряємо довге натискання КОЖНУ ітерацію loop, поки кнопка натиснута
+    if (buttonCurrentlyPressed && buttonWasPressed) {
       unsigned long pressDuration = currentTime - buttonPressStartTime;
+      
+      // Перевірка довгого натискання (>= 2 секунди)
       if (pressDuration >= LONG_PRESS_THRESHOLD_MS && !longPressDetected) {
-        // Довге натискання виявлено - перемикаємо утримання двигуна
+        // ДОВГЕ НАТИСКАННЯ - перемикаємо утримання двигуна
         longPressDetected = true;
         bool currentState = stepper.isEnabled();
         stepper.setEnabled(!currentState);
         display.resetSplashScreen();  // Оновлюємо екран
       }
-    } else if (!buttonCurrentlyPressed && buttonWasPressed) {
-      // Кнопка відпущена
+    }
+    
+    // Обробка відпускання кнопки (перехід з true в false)
+    if (!buttonCurrentlyPressed && buttonWasPressed) {
       unsigned long pressDuration = currentTime - buttonPressStartTime;
       buttonWasPressed = false;
       
       // Якщо було довге натискання - не переходимо в меню
       if (longPressDetected) {
         longPressDetected = false;
-      } else if (pressDuration < LONG_PRESS_THRESHOLD_MS && pressDuration > BUTTON_DEBOUNCE_MS) {
-        // Коротке натискання (більше 50мс для debounce, менше 2 секунд) - переходимо в меню
+      } else if (pressDuration < LONG_PRESS_THRESHOLD_MS && pressDuration >= BUTTON_DEBOUNCE_MS) {
+        // Коротке натискання - переходимо в меню
         menu.handleSplashMenu(true, false); // Перехід в меню
       }
     }
