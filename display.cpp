@@ -191,7 +191,13 @@ void Display::printMenuItem(uint8_t row, uint8_t itemIndex, const char* text, bo
 }
 
 void Display::showMainMenu(uint8_t selectedItem) {
-  _lcd->clear();
+  static uint8_t lastSelectedItem = 255;
+  
+  // Оновлюємо тільки якщо змінився вибраний пункт
+  if (lastSelectedItem != selectedItem) {
+    _lcd->clear();
+    lastSelectedItem = selectedItem;
+  }
   
   if (_rows >= 4) {
     // LCD2004 - показуємо всі пункти
@@ -225,66 +231,121 @@ void Display::showMainMenu(uint8_t selectedItem) {
 }
 
 void Display::showStatusMenu(uint32_t position, uint32_t steps360, uint16_t targetAngle, bool positionReached, bool directionCCW) {
+  static uint16_t lastCurrentDeg = 65535;
+  static uint16_t lastTargetAngle = 65535;
+  static bool lastPositionReached = false;
+  static bool lastDirectionCCW = false;
+  static bool firstDisplay = true;
+  
   uint16_t currentDeg = (uint32_t)position * 360 / steps360;
+  
+  // Оновлюємо тільки якщо змінився стан або це перший виклик
+  if (firstDisplay) {
+    _lcd->clear();
+    firstDisplay = false;
+    lastCurrentDeg = 65535; // Примусово оновити всі значення
+    lastTargetAngle = 65535;
+    lastPositionReached = !positionReached; // Примусово оновити
+    lastDirectionCCW = !directionCCW; // Примусово оновити
+  }
   
   if (_rows >= 4) {
     // LCD2004
-    _lcd->setCursor(0, 0);
-    _lcd->print("Status");
-    if (_cols >= 20) _lcd->print("              ");
-    
-    _lcd->setCursor(0, 1);
-    _lcd->print("Current: ");
-    printAt(9, 1, currentDeg);
-    _lcd->print((char)223);
-    if (_cols >= 20) _lcd->print("      ");
-    
-    _lcd->setCursor(0, 2);
-    _lcd->print("Target:  ");
-    printAt(9, 2, targetAngle);
-    _lcd->print((char)223);
-    if (_cols >= 20) _lcd->print("      ");
-    
-    _lcd->setCursor(0, 3);
-    if (positionReached) {
-      _lcd->print("Pos: OK ");
-    } else {
-      _lcd->print("Pos: Moving ");
+    if (lastCurrentDeg == 65535) {
+      _lcd->setCursor(0, 0);
+      _lcd->print("Status");
+      if (_cols >= 20) _lcd->print("              ");
+      
+      _lcd->setCursor(0, 1);
+      _lcd->print("Current: ");
     }
-    // Показуємо напрямок
-    if (directionCCW) {
-      _lcd->print("CCW");
-    } else {
-      _lcd->print("CW ");
+    
+    // Оновлюємо тільки якщо змінився поточний кут
+    if (lastCurrentDeg != currentDeg) {
+      printAt(9, 1, currentDeg);
+      _lcd->print((char)223);
+      if (_cols >= 20) _lcd->print("      ");
+      lastCurrentDeg = currentDeg;
     }
-    if (_cols >= 20) _lcd->print("   ");
+    
+    if (firstDisplay || lastTargetAngle == 65535) {
+      _lcd->setCursor(0, 2);
+      _lcd->print("Target:  ");
+    }
+    
+    // Оновлюємо тільки якщо змінився цільовий кут
+    if (lastTargetAngle != targetAngle) {
+      printAt(9, 2, targetAngle);
+      _lcd->print((char)223);
+      if (_cols >= 20) _lcd->print("      ");
+      lastTargetAngle = targetAngle;
+    }
+    
+    // Оновлюємо тільки якщо змінився стан позиції або напрямок
+    if (lastPositionReached != positionReached || lastDirectionCCW != directionCCW) {
+      _lcd->setCursor(0, 3);
+      if (positionReached) {
+        _lcd->print("Pos: OK ");
+      } else {
+        _lcd->print("Pos: Moving ");
+      }
+      // Показуємо напрямок
+      if (directionCCW) {
+        _lcd->print("CCW");
+      } else {
+        _lcd->print("CW ");
+      }
+      if (_cols >= 20) _lcd->print("   ");
+      lastPositionReached = positionReached;
+      lastDirectionCCW = directionCCW;
+    }
   } else {
     // LCD1602
-    _lcd->setCursor(0, 0);
-    _lcd->print("Cur: ");
-    printAt(5, 0, currentDeg);
-    _lcd->print((char)223);
-    // Показуємо напрямок
-    if (directionCCW) {
-      _lcd->print(" CCW");
-    } else {
-      _lcd->print(" CW ");
+    // Оновлюємо тільки якщо змінився поточний кут або напрямок
+    if (lastCurrentDeg != currentDeg || lastDirectionCCW != directionCCW) {
+      _lcd->setCursor(0, 0);
+      _lcd->print("Cur: ");
+      printAt(5, 0, currentDeg);
+      _lcd->print((char)223);
+      // Показуємо напрямок
+      if (directionCCW) {
+        _lcd->print(" CCW");
+      } else {
+        _lcd->print(" CW ");
+      }
+      lastCurrentDeg = currentDeg;
+      lastDirectionCCW = directionCCW;
     }
     
-    _lcd->setCursor(0, 1);
-    _lcd->print("Tgt: ");
-    printAt(5, 1, targetAngle);
-    _lcd->print((char)223);
-    if (positionReached) {
-      _lcd->print(" OK");
-    } else {
-      _lcd->print(" ->");
+    // Оновлюємо тільки якщо змінився цільовий кут або стан позиції
+    if (lastTargetAngle != targetAngle || lastPositionReached != positionReached) {
+      _lcd->setCursor(0, 1);
+      _lcd->print("Tgt: ");
+      printAt(5, 1, targetAngle);
+      _lcd->print((char)223);
+      if (positionReached) {
+        _lcd->print(" OK");
+      } else {
+        _lcd->print(" ->");
+      }
+      lastTargetAngle = targetAngle;
+      lastPositionReached = positionReached;
     }
   }
 }
 
 void Display::showSetAngleMenu(uint16_t targetAngle) {
-  _lcd->clear();
+  static uint16_t lastTargetAngle = 65535;
+  static bool firstDisplay = true;
+  
+  // Оновлюємо тільки якщо змінився кут або це перший виклик
+  if (firstDisplay || lastTargetAngle != targetAngle) {
+    if (firstDisplay) {
+      _lcd->clear();
+      firstDisplay = false;
+    }
+    lastTargetAngle = targetAngle;
+  }
   
   if (_rows >= 4) {
     // LCD2004
