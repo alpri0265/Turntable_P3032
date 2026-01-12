@@ -37,6 +37,12 @@ int32_t current_position = 0;
 unsigned long last_lcd = 0;
 unsigned long last_btn = 0;
 
+// Неблокуючий рух крокового двигуна
+int32_t stepper_remaining = 0;
+unsigned long last_step_time = 0;
+#define STEP_DELAY_US 600  // затримка між кроками в мікросекундах
+#define STEP_PULSE_US 4    // тривалість імпульсу STEP
+
 /* ================== EEPROM ================== */
 void eeprom_load()
 {
@@ -68,13 +74,57 @@ void isr_encB()
 }
 
 /* ================== STEPPER ================== */
-void stepper_step(int8_t dir)
+void stepper_update()
 {
-  digitalWrite(DIR_PIN, dir > 0 ? HIGH : LOW);
-  digitalWrite(STEP_PIN, HIGH);
-  delayMicroseconds(4);
-  digitalWrite(STEP_PIN, LOW);
-  delayMicroseconds(600);   // швидкість
+  if (stepper_remaining == 0) return;
+  
+  unsigned long now = micros();
+  
+  // Перевіряємо, чи минуло достатньо часу для наступного кроку
+  if (now - last_step_time >= STEP_DELAY_US)
+  {
+    // Встановлюємо напрямок (тільки якщо ще не встановлено)
+    static int8_t current_dir = 0;
+    int8_t new_dir = (stepper_remaining > 0) ? 1 : -1;
+    if (current_dir != new_dir)
+    {
+      digitalWrite(DIR_PIN, new_dir > 0 ? HIGH : LOW);
+      current_dir = new_dir;
+      // Невелика затримка для стабілізації напрямку
+      unsigned long dir_set_time = micros();
+      while (micros() - dir_set_time < 2) {} // ~2 мкс
+    }
+    
+    // Формуємо імпульс STEP
+    digitalWrite(STEP_PIN, HIGH);
+    unsigned long pulse_start = micros();
+    while (micros() - pulse_start < STEP_PULSE_US) {} // чекаємо 4 мкс
+    digitalWrite(STEP_PIN, LOW);
+    
+    // Оновлюємо позицію
+    if (stepper_remaining > 0)
+    {
+      stepper_remaining--;
+      current_position++;
+    }
+    else
+    {
+      stepper_remaining++;
+      current_position--;
+    }
+    
+    last_step_time = now;
+  }
+}
+
+void stepper_move(int32_t steps)
+{
+  if (steps == 0) return;
+  // Додаємо кроки до черги (не замінюємо)
+  stepper_remaining += steps;
+  // Якщо це перший крок, встановлюємо час
+  if (last_step_time == 0)
+    last_step_time = micros();
 }
 
 /* ================== LCD ================== */
@@ -87,6 +137,18 @@ void lcd_draw()
 
   lcd.setCursor(0, 1);
   lcd.print("Angle: ");
+  if (deg < 100) lcd.print(' ');
+  if (deg < 10)  lcd.print(' ');
+  lcd.print(deg);
+  lcd.print((char)223); // °
+  lcd.print("   ");
+}
+
+void lcd_draw_angle_only()
+{
+  uint16_t deg = (uint32_t)current_position * 360 / STEPS_360;
+
+  lcd.setCursor(7, 1);
   if (deg < 100) lcd.print(' ');
   if (deg < 10)  lcd.print(' ');
   lcd.print(deg);
@@ -124,29 +186,61 @@ void loop()
 
   if (d != 0)
   {
-    int32_t next = current_position + d;
+    // Обчислюємо цільову позицію з урахуванням поточної позиції та черги кроків
+    int32_t target_pos = current_position + stepper_remaining + d;
 
-    if (next >= MIN_POS && next <= MAX_POS)
+    // Обмежуємо позицію в межах дозволеного діапазону
+    if (target_pos < MIN_POS)
+      target_pos = MIN_POS;
+    else if (target_pos > MAX_POS)
+      target_pos = MAX_POS;
+
+    // Обчислюємо скільки кроків потрібно додати до черги
+    int32_t steps_to_add = target_pos - current_position - stepper_remaining;
+    
+    if (steps_to_add != 0)
     {
-      stepper_step(d);
-      current_position = next;
+      // Додаємо кроки до черги (неблокуюче)
+      stepper_remaining += steps_to_add;
+      if (last_step_time == 0)
+        last_step_time = micros();
     }
   }
+  
+  // Оновлюємо кроковий двигун (неблокуюче)
+  stepper_update();
 
   // Кнопка — зберегти позицію
+  static bool saved_message_shown = false;
   if (!digitalRead(ENC_BTN) && millis() - last_btn > 500)
   {
     eeprom_save();
     last_btn = millis();
+    saved_message_shown = true;
 
     lcd.setCursor(0, 1);
     lcd.print("Saved to EEPROM");
-    delay(400);
   }
 
+  // Оновлюємо LCD
+  static uint16_t last_deg = 999;
+  uint16_t deg = (uint32_t)current_position * 360 / STEPS_360;
+  
   if (millis() - last_lcd > 100)
   {
-    lcd_draw();
+    // Якщо показували повідомлення про збереження, повертаємося до відображення кута
+    if (saved_message_shown && millis() - last_btn > 400)
+    {
+      saved_message_shown = false;
+      lcd_draw_angle_only();
+      last_deg = deg;
+    }
+    // Оновлюємо кут тільки якщо він змінився
+    else if (!saved_message_shown && last_deg != deg)
+    {
+      lcd_draw_angle_only();
+      last_deg = deg;
+    }
     last_lcd = millis();
   }
 }
