@@ -25,6 +25,21 @@ Display::Display(uint8_t i2cAddress, uint8_t cols, uint8_t rows)
 
 void Display::begin() {
   _lcd->begin(_cols, _rows);
+  
+  // Створюємо кастомний символ градуса (0) в CGRAM
+  // Символ градуса: маленьке коло вгорі
+  uint8_t degreeChar[8] = {
+    0b01100,  //  **
+    0b10010,  // *  *
+    0b10010,  // *  *
+    0b01100,  //  **
+    0b00000,  //
+    0b00000,  //
+    0b00000,  //
+    0b00000   //
+  };
+  _lcd->createChar(0, degreeChar);
+  
   _lcd->clear();
   #if LCD_MODE == 1
   _lcd->backlight();
@@ -239,6 +254,7 @@ void Display::resetSplashScreen() {
 
 void Display::showSplashScreen(float encoderAngle, uint16_t targetAngle, bool isRunning, bool motorEnabled) {
   static float lastEncoderAngle = -1.0;
+  static float filteredEncoderAngle = -1.0;  // Фільтроване значення для стабільності
   static uint16_t lastTargetAngle = 65535;
   static bool lastIsRunning = false;
   static bool lastMotorEnabled = true;
@@ -249,6 +265,7 @@ void Display::showSplashScreen(float encoderAngle, uint16_t targetAngle, bool is
     firstDisplay = true;
     _splashNeedReset = false;
     lastEncoderAngle = -1.0;
+    filteredEncoderAngle = -1.0;
     lastTargetAngle = 65535;
     lastIsRunning = !isRunning;
     lastMotorEnabled = !motorEnabled;  // Примусово оновити
@@ -258,9 +275,18 @@ void Display::showSplashScreen(float encoderAngle, uint16_t targetAngle, bool is
     _lcd->clear();
     firstDisplay = false;
     lastEncoderAngle = -1.0; // Примусово оновити
+    filteredEncoderAngle = encoderAngle;  // Ініціалізуємо фільтроване значення
     lastTargetAngle = 65535;
     lastIsRunning = !isRunning;
     lastMotorEnabled = !motorEnabled;  // Примусово оновити
+  }
+  
+  // Фільтрація значення кута для стабільності відображення (експоненційне усереднення)
+  if (filteredEncoderAngle < 0.0) {
+    filteredEncoderAngle = encoderAngle;
+  } else {
+    // Експоненційне усереднення з коефіцієнтом 0.7 (30% нового значення, 70% старого)
+    filteredEncoderAngle = filteredEncoderAngle * 0.7f + encoderAngle * 0.3f;
   }
 
   if (_rows >= 4) {
@@ -282,13 +308,13 @@ void Display::showSplashScreen(float encoderAngle, uint16_t targetAngle, bool is
       _lcd->setCursor(0, 1);
       _lcd->print("Encoder: ");
     }
-    // Оновлюємо якщо змінився кут (з невеликою толерантністю для float)
-    float diff = (lastEncoderAngle < 0.0) ? 1.0 : ((encoderAngle > lastEncoderAngle) ? (encoderAngle - lastEncoderAngle) : (lastEncoderAngle - encoderAngle));
-    if (lastEncoderAngle < 0.0 || diff > 0.01f) {
-      printAt(9, 1, encoderAngle, 2);
-      _lcd->print((char)223);
+    // Оновлюємо якщо змінився фільтрований кут (з більшою толерантністю для стабільності)
+    float diff = (lastEncoderAngle < 0.0) ? 1.0 : ((filteredEncoderAngle > lastEncoderAngle) ? (filteredEncoderAngle - lastEncoderAngle) : (lastEncoderAngle - filteredEncoderAngle));
+    if (lastEncoderAngle < 0.0 || diff > 0.1f) {  // Поріг збільшено до 0.1 градуса для стабільності
+      printAt(9, 1, filteredEncoderAngle, 2);
+      _lcd->write((uint8_t)0);  // Кастомний символ градуса
       if (_cols >= 20) _lcd->print("      ");
-      lastEncoderAngle = encoderAngle;
+      lastEncoderAngle = filteredEncoderAngle;
     }
 
     // Цільовий кут (встановлений для руху)
@@ -317,13 +343,13 @@ void Display::showSplashScreen(float encoderAngle, uint16_t targetAngle, bool is
   } else {
     // LCD1602
     // Кут з абсолютного енкодера
-    float diff = (lastEncoderAngle < 0.0) ? 1.0 : ((encoderAngle > lastEncoderAngle) ? (encoderAngle - lastEncoderAngle) : (lastEncoderAngle - encoderAngle));
-    if (lastEncoderAngle < 0.0 || diff > 0.01f) {
+    float diff = (lastEncoderAngle < 0.0) ? 1.0 : ((filteredEncoderAngle > lastEncoderAngle) ? (filteredEncoderAngle - lastEncoderAngle) : (lastEncoderAngle - filteredEncoderAngle));
+    if (lastEncoderAngle < 0.0 || diff > 0.1f) {  // Поріг збільшено до 0.1 градуса для стабільності
       _lcd->setCursor(0, 0);
       _lcd->print("Enc: ");
-      printAt(5, 0, encoderAngle, 2);
-      _lcd->print((char)223);
-      lastEncoderAngle = encoderAngle;
+      printAt(5, 0, filteredEncoderAngle, 2);
+      _lcd->write((uint8_t)0);  // Кастомний символ градуса
+      lastEncoderAngle = filteredEncoderAngle;
     }
 
     // Цільовий кут та стан
