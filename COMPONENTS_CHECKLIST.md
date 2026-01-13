@@ -36,7 +36,6 @@
 - [x] `memory.h/cpp` - робота з EEPROM
 - [x] `stepper.h/cpp` - керування кроковим двигуном
 - [x] `menu.h/cpp` - система меню
-- [x] `direction_switch.h/cpp` - перемикач напрямку
 - [x] `start_stop.h/cpp` - кнопка старт-стоп зі світлодіодом
 
 ### Налаштування в config.h
