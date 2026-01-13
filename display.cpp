@@ -192,51 +192,32 @@ void Display::drawWithTarget(uint32_t position, uint32_t steps360, uint16_t targ
   }
   uint16_t currentDeg = (uint32_t)normalizedPosition * 360 / steps360;
 
-  if (_rows >= 4) {
-    // Для LCD2004 (20x4) - використовуємо більше місця
-    // Рядок 0: Заголовок
-    _lcd->setCursor(0, 0);
-    _lcd->print("Turntable Control");
-    if (_cols >= 20) _lcd->print("    ");
-    
-    // Рядок 1: Поточний кут
-    _lcd->setCursor(0, 1);
-    _lcd->print("Current: ");
-    printAt(9, 1, currentDeg);
-    _lcd->print((char)223); // °
-    if (_cols >= 20) _lcd->print("      ");
-    
-    // Рядок 2: Цільовий кут
-    _lcd->setCursor(0, 2);
-    _lcd->print("Target:  ");
-    printAt(9, 2, targetAngle);
-    _lcd->print((char)223); // °
-    if (_cols >= 20) _lcd->print("      ");
-    
-    // Рядок 3: Додаткова інформація (позиція в кроках)
-    _lcd->setCursor(0, 3);
-    _lcd->print("Steps: ");
-    _lcd->print(position);
-    if (_cols >= 20) {
-      _lcd->print(" / ");
-      _lcd->print(STEPS_360);
-    }
-  } else {
-    // Для LCD1602 (16x2) - компактний вигляд
-    // Перший рядок: поточний кут
-    _lcd->setCursor(0, 0);
-    _lcd->print("Cur: ");
-    printAt(5, 0, currentDeg);
-    _lcd->print((char)223); // °
-    _lcd->print("  ");
-
-    // Другий рядок: цільовий кут
-    _lcd->setCursor(0, 1);
-    _lcd->print("Tgt: ");
-    printAt(5, 1, targetAngle);
-    _lcd->print((char)223); // °
-    _lcd->print("  ");
-  }
+  // LCD2004 (20x4)
+  // Рядок 0: Заголовок
+  _lcd->setCursor(0, 0);
+  _lcd->print("Turntable Control");
+  _lcd->print("    ");
+  
+  // Рядок 1: Поточний кут
+  _lcd->setCursor(0, 1);
+  _lcd->print("Current: ");
+  printAt(9, 1, currentDeg);
+  _lcd->print((char)223); // °
+  _lcd->print("      ");
+  
+  // Рядок 2: Цільовий кут
+  _lcd->setCursor(0, 2);
+  _lcd->print("Target:  ");
+  printAt(9, 2, targetAngle);
+  _lcd->print((char)223); // °
+  _lcd->print("      ");
+  
+  // Рядок 3: Додаткова інформація (позиція в кроках)
+  _lcd->setCursor(0, 3);
+  _lcd->print("Steps: ");
+  _lcd->print(position);
+  _lcd->print(" / ");
+  _lcd->print(STEPS_360);
 }
 
 void Display::printMenuItem(uint8_t row, uint8_t itemIndex, const char* text, bool selected) {
@@ -304,85 +285,55 @@ void Display::showSplashScreen(float encoderAngle, uint16_t targetAngle, bool is
     filteredEncoderAngle = filteredEncoderAngle * 0.7f + encoderAngle * 0.3f;
   }
 
-  if (_rows >= 4) {
-    // LCD2004
-    // Заголовок - стан утримання двигуна
-    if (lastEncoderAngle == 65535 || lastMotorEnabled != motorEnabled) {
-      _lcd->setCursor(0, 0);
-      if (motorEnabled) {
-        _lcd->print("Motor:Hold ON");
-      } else {
-        _lcd->print("Motor:Released");
-      }
-      if (_cols >= 20) _lcd->print("    ");
-      lastMotorEnabled = motorEnabled;
-    }
-
-    // Кут з абсолютного енкодера (поточний стан)
-    if (lastEncoderAngle < 0.0) {
-      _lcd->setCursor(0, 1);
-      _lcd->print("Encoder: ");
-    }
-    // Оновлюємо якщо змінився фільтрований кут (з більшою толерантністю для стабільності)
-    float diff = (lastEncoderAngle < 0.0) ? 1.0 : ((filteredEncoderAngle > lastEncoderAngle) ? (filteredEncoderAngle - lastEncoderAngle) : (lastEncoderAngle - filteredEncoderAngle));
-    if (lastEncoderAngle < 0.0 || diff > 0.1f) {  // Поріг збільшено до 0.1 градуса для стабільності
-      printAt(9, 1, filteredEncoderAngle, 2);
-      _lcd->write((uint8_t)0);  // Кастомний символ градуса
-      if (_cols >= 20) _lcd->print("      ");
-      lastEncoderAngle = filteredEncoderAngle;
-    }
-
-    // Цільовий кут (встановлений для руху)
-    if (lastTargetAngle == 65535) {
-      _lcd->setCursor(0, 2);
-      _lcd->print("Target: ");
-    }
-    if (lastTargetAngle != targetAngle) {
-      printAt(8, 2, targetAngle);
-      _lcd->write((uint8_t)0);  // Кастомний символ градуса
-      if (_cols >= 20) _lcd->print("      ");
-      lastTargetAngle = targetAngle;
-    }
-
-    // Стан та інструкції (рядок 3) - завжди виводимо для надійності
-    _lcd->setCursor(0, 3);
-    if (isRunning) {
-      _lcd->print("Status: RUNNING    ");
+  // LCD2004
+  // Заголовок - стан утримання двигуна
+  if (lastEncoderAngle == 65535 || lastMotorEnabled != motorEnabled) {
+    _lcd->setCursor(0, 0);
+    if (motorEnabled) {
+      _lcd->print("Motor:Hold ON");
     } else {
-      _lcd->print("Menu:Ok Btn:Start  ");
+      _lcd->print("Motor:Released");
     }
-    // Заповнюємо решту рядка пробілами
-    if (_cols >= 20) {
-      _lcd->print(" ");
-    }
-    lastIsRunning = isRunning;
-  } else {
-    // LCD1602
-    // Кут з абсолютного енкодера
-    float diff = (lastEncoderAngle < 0.0) ? 1.0 : ((filteredEncoderAngle > lastEncoderAngle) ? (filteredEncoderAngle - lastEncoderAngle) : (lastEncoderAngle - filteredEncoderAngle));
-    if (lastEncoderAngle < 0.0 || diff > 0.1f) {  // Поріг збільшено до 0.1 градуса для стабільності
-      _lcd->setCursor(0, 0);
-      _lcd->print("Enc: ");
-      printAt(5, 0, filteredEncoderAngle, 2);
-      _lcd->write((uint8_t)0);  // Кастомний символ градуса
-      lastEncoderAngle = filteredEncoderAngle;
-    }
-
-    // Цільовий кут та стан
-    if (lastTargetAngle == 65535 || lastTargetAngle != targetAngle || lastIsRunning != isRunning) {
-      _lcd->setCursor(0, 1);
-      _lcd->print("Tgt: ");
-      printAt(5, 1, targetAngle);
-      _lcd->write((uint8_t)0);  // Кастомний символ градуса
-      if (isRunning) {
-        _lcd->print(" RUN");
-      } else {
-        _lcd->print(" STOP");
-      }
-      lastTargetAngle = targetAngle;
-      lastIsRunning = isRunning;
-    }
+    _lcd->print("    ");
+    lastMotorEnabled = motorEnabled;
   }
+
+  // Кут з абсолютного енкодера (поточний стан)
+  if (lastEncoderAngle < 0.0) {
+    _lcd->setCursor(0, 1);
+    _lcd->print("Encoder: ");
+  }
+  // Оновлюємо якщо змінився фільтрований кут (з більшою толерантністю для стабільності)
+  float diff = (lastEncoderAngle < 0.0) ? 1.0 : ((filteredEncoderAngle > lastEncoderAngle) ? (filteredEncoderAngle - lastEncoderAngle) : (lastEncoderAngle - filteredEncoderAngle));
+  if (lastEncoderAngle < 0.0 || diff > 0.1f) {  // Поріг збільшено до 0.1 градуса для стабільності
+    printAt(9, 1, filteredEncoderAngle, 2);
+    _lcd->write((uint8_t)0);  // Кастомний символ градуса
+    _lcd->print("      ");
+    lastEncoderAngle = filteredEncoderAngle;
+  }
+
+  // Цільовий кут (встановлений для руху)
+  if (lastTargetAngle == 65535) {
+    _lcd->setCursor(0, 2);
+    _lcd->print("Target: ");
+  }
+  if (lastTargetAngle != targetAngle) {
+    printAt(8, 2, targetAngle);
+    _lcd->write((uint8_t)0);  // Кастомний символ градуса
+    _lcd->print("      ");
+    lastTargetAngle = targetAngle;
+  }
+
+  // Стан та інструкції (рядок 3) - завжди виводимо для надійності
+  _lcd->setCursor(0, 3);
+  if (isRunning) {
+    _lcd->print("Status: RUNNING    ");
+  } else {
+    _lcd->print("Menu:Ok Btn:Start  ");
+  }
+  // Заповнюємо решту рядка пробілами
+  _lcd->print(" ");
+  lastIsRunning = isRunning;
 }
 
 void Display::showMainMenu(uint8_t selectedItem) {
@@ -394,30 +345,16 @@ void Display::showMainMenu(uint8_t selectedItem) {
     lastSelectedItem = selectedItem;
   }
   
-  if (_rows >= 4) {
-    // LCD2004 - показуємо всі пункти
-    _lcd->setCursor(0, 0);
-    _lcd->print("Main Menu");
-    if (_cols >= 20) _lcd->print("           ");
-    
-    printMenuItem(1, 0, "Set Angle", selectedItem == 0);
-    printMenuItem(2, 1, "Settings", selectedItem == 1);
-    
-    // Рядок 3: показуємо Save Position
-    printMenuItem(3, 2, "Save Position", selectedItem == 2);
-  } else {
-    // LCD1602 - показуємо по 2 пункти
-    if (selectedItem == 0) {
-      printMenuItem(0, 0, "Set Angle", true);
-      printMenuItem(1, 1, "Settings", false);
-    } else if (selectedItem == 1) {
-      printMenuItem(0, 0, "Set Angle", false);
-      printMenuItem(1, 1, "Settings", true);
-    } else {
-      printMenuItem(0, 1, "Settings", false);
-      printMenuItem(1, 2, "Save Position", true);
-    }
-  }
+  // LCD2004 - показуємо всі пункти
+  _lcd->setCursor(0, 0);
+  _lcd->print("Main Menu");
+  _lcd->print("           ");
+  
+  printMenuItem(1, 0, "Set Angle", selectedItem == 0);
+  printMenuItem(2, 1, "Settings", selectedItem == 1);
+  
+  // Рядок 3: показуємо Save Position
+  printMenuItem(3, 2, "Save Position", selectedItem == 2);
 }
 
 void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
@@ -435,15 +372,13 @@ void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
     lastDigitMode = digitMode;
   } else {
     // Нічого не змінилося - виводимо тільки перший рядок
-    if (_rows >= 4) {
-      _lcd->setCursor(0, 0);
-      _lcd->print("Target: ");
-      if (targetAngle < 100) _lcd->print(' ');
-      if (targetAngle < 10) _lcd->print(' ');
-      _lcd->print(targetAngle);
-      _lcd->write((uint8_t)0);
-      if (_cols >= 20) _lcd->print("       ");
-    }
+    _lcd->setCursor(0, 0);
+    _lcd->print("Target: ");
+    if (targetAngle < 100) _lcd->print(' ');
+    if (targetAngle < 10) _lcd->print(' ');
+    _lcd->print(targetAngle);
+    _lcd->write((uint8_t)0);
+    _lcd->print("       ");
     return;
   }
   
@@ -455,42 +390,27 @@ void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
     case 2: modeName = "Hundreds"; break;
   }
   
-  if (_rows >= 4) {
-    // LCD2004
-    // Перший рядок - виводимо завжди (як рядок 3 на першому екрані)
-    _lcd->setCursor(0, 0);
-    _lcd->print("Target: ");
-    // Виводимо кут вручну для надійності
-    if (targetAngle < 100) _lcd->print(' ');
-    if (targetAngle < 10) _lcd->print(' ');
-    _lcd->print(targetAngle);
-    _lcd->write((uint8_t)0);  // Кастомний символ градуса
-    if (_cols >= 20) _lcd->print("       ");
-    
-    _lcd->setCursor(0, 1);
-    _lcd->print("Mode: ");
-    _lcd->print(modeName);
-    if (_cols >= 20) {
-      for (uint8_t i = 6 + strlen(modeName); i < _cols; i++) {
-        _lcd->print(" ");
-      }
-    }
-    
-    _lcd->setCursor(0, 3);
-    _lcd->print("Btn:Ok");
-    if (_cols >= 20) _lcd->print("                  ");
-  } else {
-    // LCD1602
-    _lcd->setCursor(0, 0);
-    _lcd->print("Tgt: ");
-    printAt(5, 0, targetAngle);
-    _lcd->write((uint8_t)0);  // Кастомний символ градуса
+  // LCD2004
+  // Перший рядок - виводимо завжди (як рядок 3 на першому екрані)
+  _lcd->setCursor(0, 0);
+  _lcd->print("Target: ");
+  // Виводимо кут вручну для надійності
+  if (targetAngle < 100) _lcd->print(' ');
+  if (targetAngle < 10) _lcd->print(' ');
+  _lcd->print(targetAngle);
+  _lcd->write((uint8_t)0);  // Кастомний символ градуса
+  _lcd->print("       ");
+  
+  _lcd->setCursor(0, 1);
+  _lcd->print("Mode: ");
+  _lcd->print(modeName);
+  for (uint8_t i = 6 + strlen(modeName); i < _cols; i++) {
     _lcd->print(" ");
-    _lcd->print(modeName);
-    
-    _lcd->setCursor(0, 1);
-    _lcd->print("Btn: Change mode");
   }
+  
+  _lcd->setCursor(0, 3);
+  _lcd->print("Btn:Ok");
+  _lcd->print("                  ");
 }
 
 void Display::showSettingsMenu(uint8_t direction) {
@@ -501,55 +421,33 @@ void Display::showSettingsMenu(uint8_t direction) {
   bool directionChanged = (lastDirection != direction);
   lastDirection = direction;
   
-  if (_rows >= 4) {
-    // LCD2004
-    // Оновлюємо напрямок тільки якщо змінився
-    if (directionChanged) {
-      _lcd->setCursor(0, 1);
-      if (direction == 0) {
-        _lcd->print("> CW  (Clockwise)");
-        if (_cols >= 20) _lcd->print("  ");
-      } else {
-        _lcd->print("> CCW (Counter-CW)");
-        if (_cols >= 20) _lcd->print("");
-      }
-    }
-    
-    _lcd->setCursor(0, 3);
-    _lcd->print("Btn:Ok");
-    if (_cols >= 20) _lcd->print("                  ");
-  } else {
-    // LCD1602
-    if (directionChanged) {
-      _lcd->setCursor(0, 0);
-      _lcd->print("Direction: ");
-      if (direction == 0) {
-        _lcd->print("CW ");
-      } else {
-        _lcd->print("CCW");
-      }
-    }
+  // LCD2004
+  // Оновлюємо напрямок тільки якщо змінився
+  if (directionChanged) {
     _lcd->setCursor(0, 1);
-    _lcd->print("Rotate to change");
+    if (direction == 0) {
+      _lcd->print("> CW  (Clockwise)");
+      _lcd->print("  ");
+    } else {
+      _lcd->print("> CCW (Counter-CW)");
+    }
   }
+  
+  _lcd->setCursor(0, 3);
+  _lcd->print("Btn:Ok");
+  _lcd->print("                  ");
 }
 
 void Display::showSaveMenu() {
   // Екран вже очищено в Turntable_P3032.ino при переході в меню
   // Тут просто відображаємо вміст
   
-  if (_rows >= 4) {
-    _lcd->setCursor(0, 1);
-    _lcd->print("Save Position");
-    if (_cols >= 20) _lcd->print("        ");
-    
-    _lcd->setCursor(0, 3);
-    _lcd->print("Btn:Ok");
-    if (_cols >= 20) _lcd->print("                  ");
-  } else {
-    _lcd->setCursor(0, 0);
-    _lcd->print("Save Position");
-    _lcd->setCursor(0, 1);
-    _lcd->print("Press to confirm");
-  }
+  // LCD2004
+  _lcd->setCursor(0, 1);
+  _lcd->print("Save Position");
+  _lcd->print("        ");
+  
+  _lcd->setCursor(0, 3);
+  _lcd->print("Btn:Ok");
+  _lcd->print("                  ");
 }
