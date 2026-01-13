@@ -194,10 +194,10 @@ void Menu::handleSetAngleMenu(int16_t encoderDelta, bool buttonPressed) {
     // Змінюємо кут з відповідним кроком
     int32_t newAngle = (int32_t)_targetAngle + step;
     
-    // Обмежуємо в межах 0-360
+    // Обмежуємо в межах 0-359
     if (newAngle < 0) {
-      newAngle = 360;
-    } else if (newAngle > 360) {
+      newAngle = 359;
+    } else if (newAngle >= 360) {
       newAngle = 0;
     }
     
