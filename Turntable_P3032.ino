@@ -81,13 +81,8 @@ void setup() {
 void loop() {
   // Читаємо інкрементальний енкодер (для навігації по меню)
   // Обмежуємо значення для плавної навігації (тільки ±1 за раз)
+  // Примітка: encoderDelta буде обчислено безпосередньо перед використанням
   int16_t rawDelta = encoder.read();
-  int16_t encoderDelta = 0;
-  if (rawDelta > 0) {
-    encoderDelta = 1;  // Тільки один крок вгору
-  } else if (rawDelta < 0) {
-    encoderDelta = -1; // Тільки один крок вниз
-  }
   
   // Читаємо абсолютний енкодер P3022-CW360 (встановлює цільовий кут)
   // Оновлюємо на сплеш-екрані та в інших меню (крім режиму редагування)
@@ -263,6 +258,14 @@ void loop() {
       // Скидаємо всі прапорці після відпускання
       buttonWasPressedMenu = false;
       longPressDetectedMenu = false;
+    }
+    
+    // Обчислюємо encoderDelta безпосередньо перед використанням
+    int16_t encoderDelta = 0;
+    if (rawDelta > 0) {
+      encoderDelta = 1;  // Тільки один крок вгору
+    } else if (rawDelta < 0) {
+      encoderDelta = -1; // Тільки один крок вниз
     }
     
     // Оновлюємо навігацію по меню
@@ -520,6 +523,10 @@ void loop() {
           break;
           
         case MENU_SET_ANGLE:
+          // Очищаємо екран при переході в Set Angle меню
+          if (menuChanged) {
+            display.clear();
+          }
           display.showSetAngleMenu(menu.getTargetAngle(), menu.getDigitMode());
           break;
           

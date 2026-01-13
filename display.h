@@ -50,6 +50,7 @@ private:
   bool _messageShown;
   unsigned long _messageStartTime;
   bool _isI2C;
+  bool _setAngleNeedsRedraw;
   
   void drawFull(uint32_t position, uint32_t steps360);
   void drawAngleOnly(uint32_t position, uint32_t steps360);

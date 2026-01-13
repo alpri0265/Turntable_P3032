@@ -9,7 +9,7 @@ static bool _splashNeedReset = false;
 // Конструктор для 4-bit режиму
 Display::Display(uint8_t rs, uint8_t enable, uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7)
   : _lastDeg(999), _lastTargetDeg(999),
-    _lastUpdate(0), _messageShown(false), _messageStartTime(0), _isI2C(false) {
+    _lastUpdate(0), _messageShown(false), _messageStartTime(0), _isI2C(false), _setAngleNeedsRedraw(true) {
   _cols = (LCD_TYPE == 1) ? 16 : 20;
   _rows = (LCD_TYPE == 1) ? 2 : 4;
   _lcd = new LiquidCrystal(rs, enable, d4, d5, d6, d7);
@@ -18,7 +18,7 @@ Display::Display(uint8_t rs, uint8_t enable, uint8_t d4, uint8_t d5, uint8_t d6,
 // Конструктор для I2C режиму
 Display::Display(uint8_t i2cAddress, uint8_t cols, uint8_t rows)
   : _cols(cols), _rows(rows), _lastDeg(999), _lastTargetDeg(999),
-    _lastUpdate(0), _messageShown(false), _messageStartTime(0), _isI2C(true) {
+    _lastUpdate(0), _messageShown(false), _messageStartTime(0), _isI2C(true), _setAngleNeedsRedraw(true) {
   _lcd = new LiquidCrystal_I2C(i2cAddress, cols, rows);
 }
 #endif
@@ -118,6 +118,8 @@ void Display::showAngle(uint32_t position, uint32_t steps360) {
 
 void Display::clear() {
   _lcd->clear();
+  // Скидаємо прапорець для повного перемалювання Set Angle меню
+  _setAngleNeedsRedraw = true;
 }
 
 void Display::drawFull(uint32_t position, uint32_t steps360) {
@@ -360,14 +362,11 @@ void Display::showMainMenu(uint8_t selectedItem) {
 void Display::showSetAngleMenu(uint16_t targetAngle, uint8_t digitMode) {
   static uint16_t lastTargetAngle = 65535;
   static uint8_t lastDigitMode = 255;
-  static bool firstDisplay = true;
   
-  // Оновлюємо тільки якщо змінився кут, режим розряду або це перший виклик
-  if (firstDisplay || lastTargetAngle != targetAngle || lastDigitMode != digitMode) {
-    if (firstDisplay) {
-      _lcd->clear();
-      firstDisplay = false;
-    }
+  // Оновлюємо тільки якщо змінився кут, режим розряду або потрібно повне перемалювання
+  // Екран очищається в Turntable_P3032.ino при переході в меню
+  if (_setAngleNeedsRedraw || lastTargetAngle != targetAngle || lastDigitMode != digitMode) {
+    _setAngleNeedsRedraw = false;
     lastTargetAngle = targetAngle;
     lastDigitMode = digitMode;
   } else {

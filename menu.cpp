@@ -261,6 +261,7 @@ void Menu::handleSettingsMenu(int16_t encoderDelta, bool buttonPressed) {
     _currentMenu = MENU_SPLASH;
     _currentItem = 0;
     _shouldResetSplash = true;  // Встановлюємо прапорець для скидання сплеш-екрану
+    _lastMenuChangeTime = now;
   }
 }
 
@@ -271,6 +272,7 @@ void Menu::handleSaveMenu(bool buttonPressed) {
     _currentMenu = MENU_SPLASH;
     _currentItem = 0;
     _shouldResetSplash = true;  // Встановлюємо прапорець для скидання сплеш-екрану
+    _lastMenuChangeTime = millis();
   }
 }
 
@@ -292,6 +294,7 @@ void Menu::handleLongPress() {
     _currentMenu = MENU_SPLASH;
     _currentItem = 0;
     _shouldResetSplash = true;
+    _lastMenuChangeTime = millis();
     
     // Зберігаємо встановлений вручну кут, якщо були в меню Set Angle
     if (wasInSetAngle) {
