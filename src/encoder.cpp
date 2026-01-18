@@ -11,8 +11,16 @@ void Encoder::begin() {
   pinMode(_pinA, INPUT_PULLUP);
   pinMode(_pinB, INPUT_PULLUP);
   
+#if defined(ARDUINO_ARCH_STM32) || defined(STM32F1xx) || defined(ARDUINO_ARCH_STM32F1)
+  // На STM32 всі піни підтримують переривання через EXTI
+  // attachInterrupt() може працювати з піном безпосередньо
+  attachInterrupt(_pinA, isrA, CHANGE);
+  attachInterrupt(_pinB, isrB, CHANGE);
+#else
+  // Arduino (AVR) - потрібно використовувати digitalPinToInterrupt()
   attachInterrupt(digitalPinToInterrupt(_pinA), isrA, CHANGE);
   attachInterrupt(digitalPinToInterrupt(_pinB), isrB, CHANGE);
+#endif
 }
 
 int16_t Encoder::read() {
